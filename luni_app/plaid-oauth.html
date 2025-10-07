@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connecting Bank Account...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .container {
+      text-align: center;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      max-width: 400px;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 4px solid white;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    h1 { margin: 0 0 0.5rem; font-size: 24px; }
+    p { margin: 0; opacity: 0.9; font-size: 16px; }
+    .error { color: #ff6b6b; background: rgba(255, 107, 107, 0.1); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <h1>Completing Bank Connection</h1>
+    <p>Processing OAuth redirect...</p>
+    <div id="error" class="error" style="display: none;"></div>
+  </div>
+  
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script>
+    (function() {
+      console.log('Plaid OAuth redirect page loaded');
+      console.log('Current URL:', window.location.href);
+      
+      // Get URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const oauthStateId = urlParams.get('oauth_state_id');
+      const error = urlParams.get('error');
+      
+      console.log('OAuth state ID:', oauthStateId);
+      console.log('Error parameter:', error);
+      
+      // Check for error in URL
+      if (error) {
+        document.querySelector('.spinner').style.display = 'none';
+        document.querySelector('h1').textContent = 'Connection Failed';
+        document.querySelector('p').textContent = 'Redirecting back to app...';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = 'Error: ' + decodeURIComponent(error);
+        
+        // Redirect back to app with error
+        setTimeout(() => {
+          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent(error);
+          console.log('Redirecting to app with error:', callbackUrl);
+          window.location.href = callbackUrl;
+        }, 2000);
+        return;
+      }
+      
+      // Check for OAuth state ID
+      if (!oauthStateId) {
+        document.querySelector('.spinner').style.display = 'none';
+        document.querySelector('h1').textContent = 'Missing OAuth State';
+        document.querySelector('p').textContent = 'This page requires OAuth state to complete the connection.';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = 'Missing oauth_state_id parameter in URL. Please try connecting your bank again from the app.';
+        
+        // Redirect back to app with error
+        setTimeout(() => {
+          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent('Missing oauth_state_id parameter');
+          console.log('Redirecting to app with missing state error:', callbackUrl);
+          window.location.href = callbackUrl;
+        }, 3000);
+        return;
+      }
+      
+      // Get link token from localStorage or sessionStorage
+      const linkToken = localStorage.getItem('plaid_link_token') || sessionStorage.getItem('plaid_link_token');
+      
+      if (!linkToken) {
+        document.querySelector('.spinner').style.display = 'none';
+        document.querySelector('h1').textContent = 'Missing Link Token';
+        document.querySelector('p').textContent = 'Unable to complete OAuth without link token.';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = 'No link token found. Please try connecting your bank again from the app.';
+        
+        setTimeout(() => {
+          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent('Missing link token');
+          console.log('Redirecting to app with missing token error:', callbackUrl);
+          window.location.href = callbackUrl;
+        }, 3000);
+        return;
+      }
+      
+      console.log('Found link token, initializing Plaid Link');
+      
+      // Initialize Plaid Link to complete OAuth
+      const handler = Plaid.create({
+        token: linkToken,
+        receivedRedirectUri: window.location.href,
+        onSuccess: function(public_token, metadata) {
+          console.log('Plaid OAuth success:', { public_token, metadata });
+          
+          // Store the public token temporarily
+          localStorage.setItem('plaid_public_token', public_token);
+          localStorage.setItem('plaid_metadata', JSON.stringify(metadata));
+          
+          // Update UI to show success
+          document.querySelector('.spinner').style.display = 'none';
+          document.querySelector('h1').textContent = 'Success!';
+          document.querySelector('p').textContent = 'Bank account connected. Redirecting to app...';
+          
+          // Redirect back to app with success
+          const callbackUrl = 'lunifin://plaid-callback?public_token=' + 
+                            encodeURIComponent(public_token) +
+                            '&institution=' + encodeURIComponent(metadata.institution.name);
+          
+          console.log('Redirecting to app with success:', callbackUrl);
+          setTimeout(() => {
+            window.location.href = callbackUrl;
+          }, 1500);
+        },
+        onExit: function(err, metadata) {
+          console.log('Plaid OAuth exit:', err, metadata);
+          
+          // Update UI to show exit
+          document.querySelector('.spinner').style.display = 'none';
+          document.querySelector('h1').textContent = 'Connection Cancelled';
+          document.querySelector('p').textContent = 'Redirecting back to app...';
+          
+          // Redirect back to app with error
+          const errorMsg = err ? err.display_message : 'User cancelled';
+          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent(errorMsg);
+          
+          console.log('Redirecting to app with exit:', callbackUrl);
+          setTimeout(() => {
+            window.location.href = callbackUrl;
+          }, 1500);
+        },
+        onEvent: function(eventName, metadata) {
+          console.log('Plaid event:', eventName, metadata);
+        }
+      });
+      
+      // Open the Link flow to complete OAuth
+      console.log('Opening Plaid Link to complete OAuth');
+      handler.open();
+      
+    })();
+  </script>
+</body>
+</html>

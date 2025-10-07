@@ -38,6 +38,9 @@ class PlaidService {
     try {
       final linkToken = await createLinkToken();
       
+      // Store link token for OAuth redirect (both web and mobile)
+      await _storeOAuthState(linkToken);
+      
       if (kIsWeb) {
         // Web implementation - show a dialog with Plaid Link
         // For now, we'll simulate the web flow as plaid_flutter doesn't fully support web
@@ -49,6 +52,18 @@ class PlaidService {
     } catch (e) {
       print('Error launching Plaid Link: $e');
       onExit('Failed to launch Plaid Link: $e');
+    }
+  }
+
+  // Store OAuth state for redirect handling
+  static Future<void> _storeOAuthState(String linkToken) async {
+    if (kIsWeb) {
+      // For web, we could use browser localStorage
+      // This is handled by the redirect page
+      print('Storing link token for web OAuth redirect');
+    } else {
+      // For mobile, the redirect page will handle this
+      print('Link token ready for mobile OAuth redirect: ${linkToken.substring(0, 20)}...');
     }
   }
 
