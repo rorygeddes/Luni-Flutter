@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/luni_home_screen.dart';
 import 'screens/track_screen.dart';
@@ -19,7 +18,6 @@ import 'providers/onboarding_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'services/navigation_service.dart';
 import 'services/auth_service.dart';
-import 'config/app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,28 +32,10 @@ void main() async {
     print('Warning: Could not load .env file: $e');
   }
   
-  // Initialize Supabase - credentials loaded from environment or config
-  try {
-    final supabaseUrl = const String.fromEnvironment('SUPABASE_URL', defaultValue: AppConfig.supabaseUrl);
-    final supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: AppConfig.supabaseAnonKey);
-    
-    // Check if credentials are properly configured (not placeholder values)
-    if (supabaseUrl.isNotEmpty && 
-        supabaseAnonKey.isNotEmpty &&
-        supabaseUrl != 'YOUR_SUPABASE_URL_HERE' &&
-        supabaseAnonKey != 'YOUR_SUPABASE_ANON_KEY_HERE' &&
-        supabaseUrl.contains('supabase.co')) {
-      await Supabase.initialize(
-        url: supabaseUrl,
-        anonKey: supabaseAnonKey,
-      );
-      print('Supabase initialized successfully');
-    } else {
-      print('Warning: Supabase credentials not configured. Please update lib/config/app_config.dart');
-    }
-  } catch (e) {
-    print('Warning: Could not initialize Supabase: $e');
-  }
+  // Note: Supabase is now handled by the backend
+  // Authentication will go through backend API endpoints using secret keys
+  // Backend URL: ${dotenv.env['BACKEND_URL'] ?? 'http://localhost:3000'}
+  print('Frontend initialized - using backend for authentication');
   
   runApp(const LuniApp());
 }

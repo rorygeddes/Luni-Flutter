@@ -1,10 +1,14 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class BackendService {
-  static final SupabaseClient _supabase = Supabase.instance.client;
+  // Backend API base URL - you'll need to set up a backend server
+  static String get _backendUrl => dotenv.env['BACKEND_URL'] ?? 'http://localhost:3000';
+  
+  // For development/testing with direct Supabase access (backend only)
+  static String get _supabaseUrl => dotenv.env['SUPABASE_URL'] ?? '';
+  static String get _supabaseSecretKey => dotenv.env['SUPABASE_SECRET_KEY'] ?? '';
   
   // Get Plaid credentials from .env file
   static String get _plaidClientId => dotenv.env['PLAID_CLIENT_ID'] ?? '';
@@ -22,15 +26,30 @@ class BackendService {
     }
   }
   
-  // Create link token endpoint
-  static Future<String> createLinkToken() async {
+  // Authentication - get current user from backend
+  static Future<Map<String, dynamic>?> getCurrentUser(String token) async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        throw Exception('User must be authenticated to create link token');
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/auth/user'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
       }
-
-      print('Creating link token for user: ${user.email} (${user.id})');
+      return null;
+    } catch (e) {
+      print('Error getting current user: $e');
+      return null;
+    }
+  }
+  
+  // Create link token endpoint (via backend)
+  static Future<String> createLinkToken(String userToken) async {
+    try {
+      print('Creating link token via backend');
       print('Using Plaid environment: $_plaidEnvironment');
 
       // Check if Plaid credentials are configured
