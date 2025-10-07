@@ -20,8 +20,8 @@ SUPABASE_SECRET_KEY=your_actual_secret_key_here
 JWT_SECRET=luni-jwt-secret-change-this-in-production-12345
 
 # Plaid Configuration
-PLAID_CLIENT_ID=68d58e80972f670024093ef0
-PLAID_SECRET=810a68d605cbff90d5a4f487bd5f1f
+PLAID_CLIENT_ID=your_plaid_client_id
+PLAID_SECRET=your_plaid_secret
 PLAID_ENVIRONMENT=sandbox
 
 # App Configuration

@@ -18,14 +18,7 @@ Your Plaid credentials are **INVALID**. The app is failing because:
 ### Step 2: Update Your .env File
 Edit the file: `/Users/rorygeddes/Workspace/Vancouver/Luni Flutter/luni_app/assets/.env`
 
-Replace these lines:
-```
-PLAID_CLIENT_ID=68d58e80972f670024093ef0
-PLAID_SECRET=810a68d605cbff90d5a4f487bd5f1f
-PLAID_ENVIRONMENT=sandbox
-```
-
-With your REAL Plaid sandbox credentials:
+Update to your REAL Plaid sandbox credentials:
 ```
 PLAID_CLIENT_ID=your_real_sandbox_client_id
 PLAID_SECRET=your_real_sandbox_secret

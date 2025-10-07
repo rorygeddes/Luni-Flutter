@@ -25,9 +25,10 @@ Your app is configured to use **production** Plaid credentials, which means:
   - Webhook signature verification implemented
 
 - [ ] **Redirect URIs Configured**
-  - Added `lunifin://plaid-oauth` to Plaid Dashboard
-  - Added `https://luni.ca` to Plaid Dashboard
-  - Tested OAuth flow with production credentials
+  - Added `https://luni.ca/plaid-oauth` to Plaid Dashboard (production requires HTTPS!)
+  - ⚠️ Custom URI schemes (like `lunifin://`) are NOT allowed in production
+  - Tested OAuth flow with production credentials and HTTPS redirect
+  - Ensure your website can handle the OAuth callback
 
 - [ ] **Security Measures**
   - All API keys stored securely (not in code)
@@ -44,10 +45,10 @@ Your app is configured to use **production** Plaid credentials, which means:
 
 ## 🔧 Current Configuration
 
-Your `.env` file is set to:
+Your `.env` file should be set to:
 ```bash
-PLAID_CLIENT_ID=68d58e80972f670024093ef0
-PLAID_SECRET=b0697a0baa541d78f6fefb5cb54888
+PLAID_CLIENT_ID=your_production_client_id
+PLAID_SECRET=your_production_secret
 PLAID_ENVIRONMENT=production
 ```
 
@@ -85,11 +86,22 @@ Real banks have:
 - Rate limiting on their end
 - Different connection speeds
 
-### 5. **Error Handling**
+### 5. **HTTPS Redirect URI Required**
+**Critical:** Production mode requires HTTPS redirect URIs:
+- ❌ `lunifin://plaid-oauth` (custom schemes not allowed)
+- ✅ `https://luni.ca/plaid-oauth` (HTTPS required)
+
+You need:
+1. A live website at `https://luni.ca`
+2. A `/plaid-oauth` endpoint that handles the callback
+3. Deep linking to redirect back to your app
+
+### 6. **Error Handling**
 Production errors are different:
 - `ITEM_LOGIN_REQUIRED` - User needs to re-authenticate
 - `INSTITUTION_DOWN` - Bank is temporarily unavailable
 - `INSTITUTION_NOT_RESPONDING` - Bank timeout
+- `INVALID_FIELD` - Check redirect_uri uses HTTPS
 - Handle these gracefully in your UI
 
 ---

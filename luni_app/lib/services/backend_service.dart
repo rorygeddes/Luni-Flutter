@@ -91,7 +91,10 @@ class BackendService {
           'email_address': userEmail,
         },
         // Add redirect URI for mobile OAuth banks
-        'redirect_uri': 'lunifin://plaid-oauth',
+        // Production requires HTTPS, sandbox/dev allow custom schemes
+        'redirect_uri': _plaidEnvironment == 'production' 
+            ? 'https://luni.ca/plaid-oauth' 
+            : 'lunifin://plaid-oauth',
         // Add production-specific settings
         if (_plaidEnvironment == 'production') ...{
           'webhook': 'https://api.luni.ca/plaid/webhook',
