@@ -1,20 +1,17 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:plaid_flutter/plaid_flutter.dart';
 import '../models/account_model.dart';
 import '../models/transaction_model.dart';
+import '../models/queue_item_model.dart';
 import 'backend_service.dart';
 
 class PlaidService {
-  static final SupabaseClient _supabase = Supabase.instance.client;
-  
-  // For development, we'll use a mock backend URL
-  // In production, replace with your actual backend URL
-  static const String _backendUrl = 'https://your-backend-url.com';
-  
   // Create link token for Plaid Link
   static Future<String> createLinkToken() async {
-    return await BackendService.createLinkToken();
+    // For now, use a mock user token
+    // TODO: Get actual user token from backend auth
+    const mockUserToken = 'mock-user-token';
+    return await BackendService.createLinkToken(mockUserToken);
   }
 
   // Launch Plaid Link with real integration
@@ -28,6 +25,7 @@ class PlaidService {
       
       if (kIsWeb) {
         // Web implementation - show a dialog with Plaid Link
+        // For now, we'll simulate the web flow as plaid_flutter doesn't fully support web
         await _launchPlaidLinkWeb(linkToken, onSuccess, onExit, onEvent);
       } else {
         // Mobile implementation using plaid_flutter
@@ -82,7 +80,7 @@ class PlaidService {
     }
   }
 
-  // Web Plaid Link implementation
+  // Web Plaid Link implementation (still uses mock flow as plaid_flutter doesn't fully support web)
   static Future<void> _launchPlaidLinkWeb(
     String linkToken,
     Function(String) onSuccess,
@@ -114,22 +112,17 @@ class PlaidService {
     }
   }
 
-  // Exchange public token for access token
+  // Exchange public token for access token (via backend)
   static Future<void> exchangePublicToken(String publicToken) async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        print('Warning: User not authenticated, cannot save data without valid user');
-        throw Exception('User must be authenticated to save bank data');
-      }
-
+      print('Exchanging public token via backend');
+      
       // Call backend to exchange public token
       final data = await BackendService.exchangePublicToken(publicToken);
       
-      // Save the received data to Supabase
-      await _saveInstitution(user.id, data);
-      await _saveAccounts(user.id, data);
-      await _saveTransactions(user.id, data);
+      print('Successfully exchanged public token and received data');
+      print('Received ${data['accounts']?.length ?? 0} accounts');
+      print('Received ${data['transactions']?.length ?? 0} transactions');
       
     } catch (e) {
       print('Error exchanging public token: $e');
@@ -137,179 +130,42 @@ class PlaidService {
     }
   }
 
-  // Save data received from backend
-  static Future<void> _saveInstitution(String userId, Map<String, dynamic> data) async {
-    final user = _supabase.auth.currentUser;
-    final userEmail = user?.email ?? 'unknown@example.com';
-    
-    await _supabase.from('institutions').upsert({
-      'id': 'ins_${data['item_id']}',
-      'user_id': userId,
-      'user_email': userEmail,
-      'access_token': data['access_token'],
-      'item_id': data['item_id'],
-      'name': 'Connected Bank',
-      'created_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'item_id');
-    
-    print('Saved institution for user: $userEmail');
-  }
+  // Note: All data saving is now handled by the backend
+  // The backend will save to Supabase using the SECRET key
+  // Frontend only needs to exchange tokens and display data
 
-  static Future<void> _saveAccounts(String userId, Map<String, dynamic> data) async {
-    final user = _supabase.auth.currentUser;
-    final userEmail = user?.email ?? 'unknown@example.com';
-    final accounts = data['accounts'] as List<dynamic>;
-    
-    for (final accountData in accounts) {
-      await _supabase.from('accounts').upsert({
-        'id': accountData['account_id'],
-        'user_id': userId,
-        'user_email': userEmail,
-        'institution_id': 'ins_${data['item_id']}',
-        'name': accountData['name'],
-        'type': accountData['type'],
-        'subtype': accountData['subtype'],
-        'balance': (accountData['balances']['current'] as num).toDouble(),
-        'mask': accountData['mask'],
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'id');
-    }
-    
-    print('Saved ${accounts.length} accounts for user: $userEmail');
-  }
-
-  static Future<void> _saveTransactions(String userId, Map<String, dynamic> data) async {
-    final user = _supabase.auth.currentUser;
-    final userEmail = user?.email ?? 'unknown@example.com';
-    final transactions = data['transactions'] as List<dynamic>;
-    
-    for (final transactionData in transactions) {
-      await _supabase.from('transactions').upsert({
-        'id': transactionData['transaction_id'],
-        'user_id': userId,
-        'user_email': userEmail,
-        'account_id': transactionData['account_id'],
-        'institution_id': 'ins_${data['item_id']}',
-        'amount': (transactionData['amount'] as num).toDouble(),
-        'description': transactionData['name'],
-        'merchant_name': transactionData['merchant_name'] ?? transactionData['name'],
-        'date': DateTime.parse(transactionData['date']).toIso8601String().split('T')[0],
-        'category': transactionData['category']?.isNotEmpty == true ? transactionData['category'][0] : 'Other',
-        'subcategory': transactionData['subcategory'] ?? 'Other',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'id');
-
-      // Add to transaction queue for AI review
-      await _supabase.from('transaction_queue').upsert({
-        'user_id': userId,
-        'user_email': userEmail,
-        'transaction_id': transactionData['transaction_id'],
-        'ai_description': transactionData['name'],
-        'ai_category': transactionData['category']?.isNotEmpty == true ? transactionData['category'][0] : 'Other',
-        'ai_subcategory': transactionData['subcategory'] ?? 'Other',
-        'confidence_score': 0.8,
-        'status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'transaction_id');
-    }
-    
-    print('Saved ${transactions.length} transactions for user: $userEmail');
-  }
-
-  // Get user's accounts
+  // Get user's accounts (mock data for now)
   static Future<List<AccountModel>> getAccounts() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      print('User not authenticated, returning empty accounts list');
-      return [];
-    }
-
     try {
-      final response = await _supabase
-          .from('accounts')
-          .select()
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false);
-
-      return response.map<AccountModel>((json) => AccountModel.fromJson(json)).toList();
+      // TODO: Get accounts from backend API
+      // For now, return mock data
+      return [];
     } catch (e) {
       print('Error getting accounts: $e');
       return [];
     }
   }
 
-  // Get user's transactions
-  static Future<List<TransactionModel>> getTransactions() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      print('User not authenticated, returning empty transactions list');
-      return [];
-    }
-
+  // Get user's transactions (mock data for now)
+  static Future<List<TransactionModel>> getTransactions({int limit = 50}) async {
     try {
-      final response = await _supabase
-          .from('transactions')
-          .select()
-          .eq('user_id', user.id)
-          .order('date', ascending: false);
-
-      return response.map<TransactionModel>((json) => TransactionModel.fromJson(json)).toList();
+      // TODO: Get transactions from backend API
+      // For now, return mock data
+      return [];
     } catch (e) {
       print('Error getting transactions: $e');
       return [];
     }
   }
 
-  // Check if user has connected accounts
-  static Future<bool> hasConnectedAccounts() async {
-    final accounts = await getAccounts();
-    return accounts.isNotEmpty;
-  }
-
-  // Get queued transactions for review
-  static Future<List<Map<String, dynamic>>> getQueuedTransactions({int limit = 5}) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) {
-      print('User not authenticated, returning empty queue list');
-      return [];
-    }
-
+  // Get pending transactions from queue (mock data for now)
+  static Future<List<QueueItemModel>> getQueuedTransactions({int limit = 5}) async {
     try {
-      final response = await _supabase
-          .from('transaction_queue')
-          .select('''
-            *,
-            transactions!inner(
-              id,
-              amount,
-              description,
-              merchant_name,
-              date
-            )
-          ''')
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-          .limit(limit);
-
-      return response.map<Map<String, dynamic>>((item) => {
-        'id': item['id'],
-        'transaction_id': item['transaction_id'],
-        'ai_description': item['ai_description'],
-        'ai_category': item['ai_category'],
-        'ai_subcategory': item['ai_subcategory'],
-        'confidence_score': item['confidence_score'],
-        'status': item['status'],
-        'amount': item['transactions']['amount'],
-        'description': item['transactions']['description'],
-        'merchant_name': item['transactions']['merchant_name'],
-        'date': item['transactions']['date'],
-      }).toList();
+      // TODO: Get transaction queue from backend API
+      // For now, return mock data
+      return [];
     } catch (e) {
-      print('Error getting queued transactions: $e');
+      print('Error getting transaction queue: $e');
       return [];
     }
   }

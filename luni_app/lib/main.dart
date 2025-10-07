@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/luni_home_screen.dart';
 import 'screens/track_screen.dart';
 import 'screens/split_screen.dart';
@@ -22,7 +23,7 @@ import 'services/auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables from .env file in assets folder
+  // Load environment variables from .env file
   try {
     await dotenv.load(fileName: ".env");
     print('Environment variables loaded successfully');
@@ -32,10 +33,16 @@ void main() async {
     print('Warning: Could not load .env file: $e');
   }
   
-  // Note: Supabase is now handled by the backend
-  // Authentication will go through backend API endpoints using secret keys
-  // Backend URL: ${dotenv.env['BACKEND_URL'] ?? 'http://localhost:3000'}
-  print('Frontend initialized - using backend for authentication');
+  // Initialize Supabase
+  try {
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL'] ?? '',
+      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    );
+    print('Supabase initialized successfully');
+  } catch (e) {
+    print('Warning: Could not initialize Supabase: $e');
+  }
   
   runApp(const LuniApp());
 }
@@ -135,15 +142,10 @@ class _AppInitializerState extends State<AppInitializer> {
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
-                  'Please update lib/config/app_config.dart with your Supabase credentials.',
+                  'Please update .env file with your Supabase credentials.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16),
                 ),
-              ),
-              SizedBox(height: 24),
-              Text(
-                'See SUPABASE_SETUP_INSTRUCTIONS.md for instructions',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
             ],
           ),

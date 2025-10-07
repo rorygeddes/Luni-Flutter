@@ -32,33 +32,9 @@ class TransactionProvider extends ChangeNotifier {
       final processedTransactions = <Map<String, dynamic>>[];
       
       for (final queueItem in queueItems) {
-        final transaction = queueItem['transactions'] as Map<String, dynamic>;
-        
-        // Get AI categorization if not already done
-        if (transaction['ai_category_id'] == null) {
-          final categorization = await OpenAIService.categorizeTransaction(
-            description: transaction['raw_description'] as String,
-            merchantNorm: transaction['merchant_norm'] as String,
-            amount: (transaction['amount_cents'] as int) / 100.0,
-            date: DateTime.parse(transaction['posted_at'] as String),
-          );
-          
-          // Update transaction with AI categorization
-          await _updateTransactionWithAI(
-            transaction['id'] as String,
-            categorization,
-          );
-          
-          transaction['ai_category_id'] = _findCategoryId(categorization.category, categorization.subcategory);
-          transaction['ai_category_name'] = categorization.subcategory;
-          transaction['ai_confidence'] = categorization.confidence;
-        }
-        
-        // Add to processed list
-        processedTransactions.add({
-          ...queueItem,
-          'transactions': transaction,
-        });
+        // TODO: Get transaction data from queueItem.transactionId
+        // For now, skip processing since we don't have transaction data
+        continue;
       }
       
       _queuedTransactions = processedTransactions;

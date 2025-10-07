@@ -71,8 +71,8 @@ class BackendService {
           'country_codes': ['US', 'CA'],
           'language': 'en',
           'user': {
-            'client_user_id': user.id,
-            'email_address': user.email,
+            'client_user_id': userToken,
+            'email_address': 'user@example.com', // TODO: Get from backend auth
           },
           'webhook': 'https://your-backend-url.com/webhook', // Update this with your webhook URL
         }),
@@ -123,15 +123,10 @@ class BackendService {
     }
   }
   
-  // Exchange public token endpoint
+  // Exchange public token endpoint (via backend)
   static Future<Map<String, dynamic>> exchangePublicToken(String publicToken) async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) {
-        throw Exception('User must be authenticated to exchange public token');
-      }
-
-      print('Exchanging public token for user: ${user.email} (${user.id})');
+      print('Exchanging public token via backend');
       print('Public token: ${publicToken.substring(0, 20)}...');
 
       // Check if Plaid credentials are configured
@@ -193,7 +188,7 @@ class BackendService {
         return {
           'access_token': accessToken,
           'item_id': itemId,
-          'user_email': user.email ?? 'unknown@example.com',
+          'user_email': 'user@example.com',
           'accounts': accountsData['accounts'],
           'transactions': transactionsData['transactions'],
         };
