@@ -93,7 +93,7 @@ class BackendService {
         // Add redirect URI for mobile OAuth banks
         // Production requires HTTPS, sandbox/dev allow custom schemes
         'redirect_uri': _plaidEnvironment == 'production' 
-            ? 'https://rorygeddes.github.io/Luni-Flutter/plaid-oauth-site/' 
+            ? 'https://luni.ca/plaid-oauth' 
             : 'lunifin://plaid-oauth',
         // Add production-specific settings
         if (_plaidEnvironment == 'production') ...{
