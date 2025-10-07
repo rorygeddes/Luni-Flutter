@@ -25,6 +25,8 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
     try {
       // First try to load real accounts from database
       final realAccounts = await PlaidService.getAccounts();
+      if (!mounted) return;
+      
       if (realAccounts.isNotEmpty) {
         setState(() {
           _accounts = realAccounts;
@@ -37,6 +39,8 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
       }
     } catch (e) {
       print('Error loading accounts: $e');
+      if (!mounted) return;
+      
       setState(() {
         _accounts = [];
       });
@@ -53,7 +57,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
             // Exchange the public token for access token and save account data
             await PlaidService.exchangePublicToken(publicToken);
             
+            if (!mounted) return;
             setState(() => _isConnecting = false);
+            
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Bank account connected successfully!'),
@@ -65,7 +72,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
             // Reload accounts to show the newly connected ones
             await _loadAccounts();
           } catch (e) {
+            if (!mounted) return;
             setState(() => _isConnecting = false);
+            
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Error processing connection: $e'),
@@ -76,7 +86,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
           }
         },
         onExit: (reason) {
+          if (!mounted) return;
           setState(() => _isConnecting = false);
+          
+          if (!mounted) return;
           if (reason.toLowerCase().contains('cancelled') || reason.toLowerCase().contains('exit')) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -97,6 +110,8 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
         },
         onEvent: (event) {
           print('Plaid event: $event');
+          if (!mounted) return;
+          
           // Show progress to user
           if (event == 'OPENED') {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -118,8 +133,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
         },
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isConnecting = false);
       
+      if (!mounted) return;
       String errorMessage = e.toString();
       if (errorMessage.contains('Plaid credentials not configured') || 
           errorMessage.contains('INVALID_API_KEYS') ||
@@ -145,7 +162,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
       // Simulate demo bank connection
       await Future.delayed(const Duration(seconds: 2));
       
+      if (!mounted) return;
       setState(() => _isConnecting = false);
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Demo bank account connected successfully!'),
@@ -157,7 +177,10 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
       _loadAccounts();
       
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isConnecting = false);
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Demo connection error: $e'),
