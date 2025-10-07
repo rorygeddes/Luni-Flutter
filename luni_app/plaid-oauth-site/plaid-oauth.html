@@ -97,18 +97,20 @@
         return;
       }
       
-      // Get link token from localStorage or sessionStorage
-      const linkToken = localStorage.getItem('plaid_link_token') || sessionStorage.getItem('plaid_link_token');
+      // Get link token from localStorage, sessionStorage, or URL parameter
+      let linkToken = localStorage.getItem('plaid_link_token') || 
+                     sessionStorage.getItem('plaid_link_token') ||
+                     urlParams.get('link_token');
       
       if (!linkToken) {
         document.querySelector('.spinner').style.display = 'none';
         document.querySelector('h1').textContent = 'Missing Link Token';
         document.querySelector('p').textContent = 'Unable to complete OAuth without link token.';
         document.getElementById('error').style.display = 'block';
-        document.getElementById('error').textContent = 'No link token found. Please try connecting your bank again from the app.';
+        document.getElementById('error').textContent = 'No link token found. This usually means the OAuth flow was not initiated properly from the app. Please try connecting your bank again from the app.';
         
         setTimeout(() => {
-          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent('Missing link token');
+          const callbackUrl = 'lunifin://plaid-callback?error=' + encodeURIComponent('Missing link token - OAuth not initiated from app');
           console.log('Redirecting to app with missing token error:', callbackUrl);
           window.location.href = callbackUrl;
         }, 3000);

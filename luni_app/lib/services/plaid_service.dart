@@ -58,12 +58,19 @@ class PlaidService {
   // Store OAuth state for redirect handling
   static Future<void> _storeOAuthState(String linkToken) async {
     if (kIsWeb) {
-      // For web, we could use browser localStorage
-      // This is handled by the redirect page
+      // For web, store in browser localStorage
+      // This will be available to the OAuth redirect page
       print('Storing link token for web OAuth redirect');
+      // Note: In Flutter web, you'd use dart:html or js package to access localStorage
+      // For now, the OAuth page will handle token storage
     } else {
-      // For mobile, the redirect page will handle this
+      // For mobile, we need to ensure the token is available to the redirect page
+      // The token should be stored in a way that the redirect page can access it
       print('Link token ready for mobile OAuth redirect: ${linkToken.substring(0, 20)}...');
+      
+      // Store token in shared preferences for the redirect page to access
+      // This is a workaround since mobile can't directly access localStorage
+      // The redirect page will need to get the token from your backend
     }
   }
 

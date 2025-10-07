@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug OAuth Flow</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .error { background: #ffe6e6; border-color: #ff6b6b; }
+        .success { background: #e6ffe6; border-color: #4caf50; }
+        .info { background: #e6f3ff; border-color: #2196f3; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Plaid OAuth Debug Page</h1>
+    
+    <div class="section info">
+        <h2>Current URL Information</h2>
+        <p><strong>Full URL:</strong> <span id="full-url"></span></p>
+        <p><strong>Host:</strong> <span id="host"></span></p>
+        <p><strong>Path:</strong> <span id="path"></span></p>
+        <p><strong>Query String:</strong> <span id="query"></span></p>
+    </div>
+    
+    <div class="section" id="params-section">
+        <h2>URL Parameters</h2>
+        <div id="params-content"></div>
+    </div>
+    
+    <div class="section" id="storage-section">
+        <h2>Browser Storage</h2>
+        <div id="storage-content"></div>
+    </div>
+    
+    <div class="section" id="plaid-section">
+        <h2>Plaid Configuration Check</h2>
+        <div id="plaid-content"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Test Links</h2>
+        <p>Test different scenarios:</p>
+        <ul>
+            <li><a href="?oauth_state_id=test123">With oauth_state_id</a></li>
+            <li><a href="?oauth_state_id=test123&error=test_error">With error</a></li>
+            <li><a href="?">No parameters</a></li>
+        </ul>
+    </div>
+
+    <script>
+        function updateDisplay() {
+            // URL Information
+            document.getElementById('full-url').textContent = window.location.href;
+            document.getElementById('host').textContent = window.location.host;
+            document.getElementById('path').textContent = window.location.pathname;
+            document.getElementById('query').textContent = window.location.search || '(none)';
+            
+            // URL Parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramsContent = document.getElementById('params-content');
+            
+            if (urlParams.toString()) {
+                let paramsHtml = '<pre>';
+                for (const [key, value] of urlParams) {
+                    paramsHtml += `${key}: ${value}\n`;
+                }
+                paramsHtml += '</pre>';
+                paramsContent.innerHTML = paramsHtml;
+            } else {
+                paramsContent.innerHTML = '<p>No URL parameters found</p>';
+                document.getElementById('params-section').className = 'section error';
+            }
+            
+            // Browser Storage
+            const storageContent = document.getElementById('storage-content');
+            const linkToken = localStorage.getItem('plaid_link_token') || sessionStorage.getItem('plaid_link_token');
+            
+            if (linkToken) {
+                storageContent.innerHTML = '<p class="success">✅ Link token found in storage</p>';
+                document.getElementById('storage-section').className = 'section success';
+            } else {
+                storageContent.innerHTML = '<p class="error">❌ No link token found in localStorage or sessionStorage</p>';
+                document.getElementById('storage-section').className = 'section error';
+            }
+            
+            // Plaid Configuration
+            const plaidContent = document.getElementById('plaid-content');
+            const oauthStateId = urlParams.get('oauth_state_id');
+            
+            let plaidHtml = '<ul>';
+            plaidHtml += `<li>OAuth State ID: ${oauthStateId ? '✅ Found' : '❌ Missing'}</li>`;
+            plaidHtml += `<li>Link Token: ${linkToken ? '✅ Found' : '❌ Missing'}</li>`;
+            plaidHtml += `<li>Plaid SDK: ${typeof Plaid !== 'undefined' ? '✅ Loaded' : '❌ Not loaded'}</li>`;
+            plaidHtml += '</ul>';
+            
+            if (oauthStateId && linkToken && typeof Plaid !== 'undefined') {
+                plaidHtml += '<p class="success">✅ All requirements met for OAuth flow</p>';
+                document.getElementById('plaid-section').className = 'section success';
+            } else {
+                plaidHtml += '<p class="error">❌ Missing requirements for OAuth flow</p>';
+                document.getElementById('plaid-section').className = 'section error';
+            }
+            
+            plaidContent.innerHTML = plaidHtml;
+        }
+        
+        // Update display on page load
+        updateDisplay();
+        
+        // Update display when URL changes
+        window.addEventListener('popstate', updateDisplay);
+    </script>
+    
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+</body>
+</html>
