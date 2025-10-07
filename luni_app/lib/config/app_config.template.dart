@@ -10,8 +10,8 @@ class AppConfig {
   // 2. Use environment variables in production
   // 3. Consider using a backend proxy for sensitive operations
   
-  static const String supabaseUrl = 'https://cpsjbwtezrnajaiolsim.supabase.co'; // Replace with your actual Supabase URL
-  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwc2pid3RlenJuYWphaW9sc2ltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MjE3MzQsImV4cCI6MjA2NzQ5NzczNH0.7nAIckVaf3xiByomVUl_wUPWtdRMbNSnmp7DcIei7VU'; // Replace with your actual Supabase anon key
+  static const String supabaseUrl = 'YOUR_SUPABASE_URL_HERE'; // Replace with your actual Supabase URL
+  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY_HERE'; // Replace with your actual Supabase anon key
   
   // Production should use:
   // flutter run --dart-define=SUPABASE_URL=your_url --dart-define=SUPABASE_ANON_KEY=your_key
