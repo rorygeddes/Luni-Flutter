@@ -52,7 +52,14 @@ class BackendService {
     try {
       print('Creating link token via backend');
       print('Using Plaid environment: $_plaidEnvironment');
+      print('Plaid base URL: $_plaidBaseUrl');
       print('User ID: $userId');
+      
+      if (_plaidEnvironment == 'production') {
+        print('⚠️  PRODUCTION MODE: Using real bank connections!');
+      } else {
+        print('🧪 ${_plaidEnvironment.toUpperCase()} MODE: Use test credentials');
+      }
 
       // Check if Plaid credentials are configured
       if (_plaidClientId.isEmpty || _plaidSecret.isEmpty) {
@@ -75,7 +82,7 @@ class BackendService {
       final requestBody = {
         'client_id': _plaidClientId,
         'secret': _plaidSecret,
-        'client_name': 'Luni App',
+        'client_name': 'Luni',
         'products': ['transactions'],
         'country_codes': ['US', 'CA'],
         'language': 'en',
@@ -85,6 +92,18 @@ class BackendService {
         },
         // Add redirect URI for mobile OAuth banks
         'redirect_uri': 'lunifin://plaid-oauth',
+        // Add production-specific settings
+        if (_plaidEnvironment == 'production') ...{
+          'webhook': 'https://api.luni.ca/plaid/webhook',
+          'account_filters': {
+            'depository': {
+              'account_subtypes': ['checking', 'savings'],
+            },
+            'credit': {
+              'account_subtypes': ['credit card'],
+            },
+          },
+        },
       };
       
       print('Plaid request: ${json.encode(requestBody).replaceAll(_plaidSecret, '***')}');

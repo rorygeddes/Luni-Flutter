@@ -30,8 +30,13 @@ Edit `/luni_app/.env` and replace the Plaid credentials:
 # Plaid Configuration
 PLAID_CLIENT_ID=your_actual_client_id_here
 PLAID_SECRET=your_actual_secret_here
-PLAID_ENVIRONMENT=sandbox
+PLAID_ENVIRONMENT=sandbox  # Options: sandbox, development, production
 ```
+
+**Environment Options:**
+- `sandbox` - Free testing with mock banks (recommended for development)
+- `development` - Low-cost testing with real banks
+- `production` - Full production with real banks (see PLAID_PRODUCTION_SETUP.md)
 
 ### Step 4: Configure Redirect URI in Plaid Dashboard
 1. Go to https://dashboard.plaid.com/team/api
