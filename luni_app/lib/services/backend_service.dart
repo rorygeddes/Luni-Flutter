@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class BackendService {
   // Backend API base URL - you'll need to set up a backend server
@@ -47,45 +48,72 @@ class BackendService {
   }
   
   // Create link token endpoint (via backend)
-  static Future<String> createLinkToken(String userToken) async {
+  static Future<String> createLinkToken(String userId) async {
     try {
       print('Creating link token via backend');
       print('Using Plaid environment: $_plaidEnvironment');
+      print('User ID: $userId');
 
       // Check if Plaid credentials are configured
       if (_plaidClientId.isEmpty || _plaidSecret.isEmpty) {
-        throw Exception('Plaid credentials not configured. Please update assets/.env file with your actual PLAID_CLIENT_ID, PLAID_SECRET, and PLAID_ENVIRONMENT. See UPDATE_PLAID_CREDENTIALS.md for instructions.');
+        throw Exception('Plaid credentials not configured. Please update .env file with your actual PLAID_CLIENT_ID, PLAID_SECRET, and PLAID_ENVIRONMENT.');
+      }
+
+      // Get user email from Supabase if available
+      String userEmail = 'user@example.com';
+      try {
+        final supabase = Supabase.instance.client;
+        final user = supabase.auth.currentUser;
+        if (user?.email != null) {
+          userEmail = user!.email!;
+        }
+      } catch (e) {
+        print('Could not get user email: $e');
       }
 
       // Create real link token using Plaid API
+      final requestBody = {
+        'client_id': _plaidClientId,
+        'secret': _plaidSecret,
+        'client_name': 'Luni App',
+        'products': ['transactions'],
+        'country_codes': ['US', 'CA'],
+        'language': 'en',
+        'user': {
+          'client_user_id': userId,
+          'email_address': userEmail,
+        },
+        // Add redirect URI for mobile OAuth banks
+        'redirect_uri': 'lunifin://plaid-oauth',
+      };
+      
+      print('Plaid request: ${json.encode(requestBody).replaceAll(_plaidSecret, '***')}');
+      
       final response = await http.post(
         Uri.parse('$_plaidBaseUrl/link/token/create'),
         headers: {
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'client_id': _plaidClientId,
-          'secret': _plaidSecret,
-          'client_name': 'Luni App',
-          'products': ['transactions', 'accounts'],
-          'country_codes': ['US', 'CA'],
-          'language': 'en',
-          'user': {
-            'client_user_id': userToken,
-            'email_address': 'user@example.com', // TODO: Get from backend auth
-          },
-          'webhook': 'https://your-backend-url.com/webhook', // Update this with your webhook URL
-        }),
+        body: json.encode(requestBody),
       );
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final linkToken = data['link_token'] as String;
-        print('Generated real link token: ${linkToken.substring(0, 20)}...');
+        print('✅ Generated real link token: ${linkToken.substring(0, 20)}...');
         return linkToken;
       } else {
-        print('Plaid API error: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to create link token: ${response.body}');
+        final errorBody = json.decode(response.body);
+        final errorCode = errorBody['error_code'] ?? 'UNKNOWN';
+        final errorMessage = errorBody['error_message'] ?? response.body;
+        final displayMessage = errorBody['display_message'] ?? errorMessage;
+        
+        print('❌ Plaid API error: ${response.statusCode}');
+        print('Error code: $errorCode');
+        print('Error message: $errorMessage');
+        print('Display message: $displayMessage');
+        
+        throw Exception('Plaid error: $displayMessage');
       }
       
       // Production code would look like this:
@@ -118,8 +146,9 @@ class BackendService {
       }
       */
     } catch (e) {
-      print('Error creating link token: $e');
-      return 'link-sandbox-fallback-token';
+      print('❌ Error creating link token: $e');
+      // Don't return a fallback token - let the error propagate so user sees it
+      rethrow;
     }
   }
   

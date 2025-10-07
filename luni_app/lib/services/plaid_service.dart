@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:plaid_flutter/plaid_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/account_model.dart';
 import '../models/transaction_model.dart';
 import '../models/queue_item_model.dart';
@@ -8,10 +9,24 @@ import 'backend_service.dart';
 class PlaidService {
   // Create link token for Plaid Link
   static Future<String> createLinkToken() async {
-    // For now, use a mock user token
-    // TODO: Get actual user token from backend auth
-    const mockUserToken = 'mock-user-token';
-    return await BackendService.createLinkToken(mockUserToken);
+    // Get actual user ID from Supabase auth
+    // This is critical - Plaid requires a unique user identifier
+    String userId;
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        userId = user.id;
+      } else {
+        // Fallback to a unique identifier if not logged in
+        userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      }
+    } catch (e) {
+      print('Error getting user ID: $e');
+      userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+    }
+    
+    return await BackendService.createLinkToken(userId);
   }
 
   // Launch Plaid Link with real integration
