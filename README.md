@@ -58,90 +58,138 @@ A comprehensive financial management Flutter application with Plaid integration,
 - A Supabase account ([Sign up here](https://supabase.com/))
 - OpenAI API key (optional, for AI features)
 
+## 🏗 Architecture
+
+**Important:** This app uses a **backend-first architecture** for security.
+
+- **Frontend (Flutter)**: User interface only, no direct database access
+- **Backend (Node.js)**: Handles all Supabase operations using SECRET keys
+- **Security**: All sensitive credentials stay server-side
+
+See [ARCHITECTURE_SUMMARY.md](ARCHITECTURE_SUMMARY.md) for details.
+
 ## 🛠 Setup Instructions
 
 ### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/rorygeddes/Luni-Flutter.git
-cd Luni-Flutter/luni_app
+cd Luni-Flutter
 ```
 
-### 2. Install Dependencies
+### 2. Backend Setup (Required First)
 
 ```bash
+# Navigate to backend
+cd backend
+
+# Install dependencies
+npm install
+
+# Create .env file
+cat > .env << EOF
+PORT=3000
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SECRET_KEY=your_service_role_secret_key  # ⚠️ Use SECRET key, NOT anon key
+JWT_SECRET=your-random-jwt-secret
+PLAID_CLIENT_ID=your_plaid_client_id
+PLAID_SECRET=your_plaid_secret
+PLAID_ENVIRONMENT=sandbox
+NODE_ENV=development
+EOF
+
+# Start backend server
+npm run dev
+```
+
+**Get Supabase SECRET Key:**
+1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
+2. Find "**service_role**" section (NOT anon/public)
+3. Copy the "**secret**" value
+4. Paste as `SUPABASE_SECRET_KEY` in backend `.env`
+
+See [backend/README.md](backend/README.md) for detailed backend setup.
+
+### 3. Flutter Setup
+
+```bash
+# Navigate to Flutter app
+cd luni_app
+
+# Install dependencies
 flutter pub get
 ```
 
-### 3. Configure Environment Variables
+### 4. Configure Flutter Environment
 
 Create a `.env` file in the `luni_app/assets/` directory:
 
 ```bash
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
+# Backend Configuration (Required)
+BACKEND_URL=http://localhost:3000  # Or your deployed backend URL
 
-# Plaid Configuration
+# Plaid Configuration (Optional - backend can handle this)
 PLAID_CLIENT_ID=your_plaid_client_id
 PLAID_SECRET=your_plaid_secret
-PLAID_ENVIRONMENT=sandbox  # Use 'sandbox' for testing, 'production' for live
-
-# OpenAI Configuration (Optional)
-OPENAI_API_KEY=your_openai_api_key
+PLAID_ENVIRONMENT=sandbox
 
 # App Configuration
 APP_ENVIRONMENT=development
 ```
 
-**Important:** Never commit the `.env` file to version control. It's already included in `.gitignore`.
+**Important:** 
+- Never commit the `.env` file to version control
+- Supabase keys are NOT in Flutter - backend handles them
+- Use SECRET keys in backend, NOT anon keys
 
-### 4. Configure Supabase
+See [ENV_TEMPLATE.md](luni_app/ENV_TEMPLATE.md) for detailed configuration.
+
+### 5. Configure Supabase Database
 
 1. Create a new Supabase project
 2. Run the SQL setup script: `luni_app/new_supabase_setup.sql`
-3. Enable Google OAuth in Supabase Authentication settings
-4. Add your redirect URLs in Supabase settings
+3. Get your SECRET key (service_role) for the backend
+4. Add to backend `.env` file
 
 See [SUPABASE_SETUP_INSTRUCTIONS.md](luni_app/SUPABASE_SETUP_INSTRUCTIONS.md) for detailed instructions.
 
-### 5. Configure Plaid
+### 6. Configure Plaid
 
 1. Sign up at [Plaid Dashboard](https://dashboard.plaid.com/)
 2. Get your Sandbox credentials (Client ID and Secret)
-3. Add them to your `.env` file
-4. For production, update to production credentials and environment
+3. Add them to your **backend** `.env` file
+4. For production, update to production credentials
 
 See [PLAID_CREDENTIALS_SETUP.md](luni_app/PLAID_CREDENTIALS_SETUP.md) for detailed instructions.
 
-### 6. Configure Google Sign-In
-
-Follow the platform-specific setup:
-
-**iOS:**
-- Add redirect URL to `Info.plist`
-- Configure URL schemes
-- See [GOOGLE_SIGNIN_SETUP.md](luni_app/GOOGLE_SIGNIN_SETUP.md)
-
-**Android:**
-- Update `AndroidManifest.xml`
-- Add app links configuration
-- See [GOOGLE_SIGNIN_SETUP.md](luni_app/GOOGLE_SIGNIN_SETUP.md)
-
 ## 🏃‍♂️ Running the App
 
-### Web
+**Important:** Backend must be running first!
+
+### Step 1: Start Backend (Required)
 ```bash
+cd backend
+npm run dev
+# Server running on http://localhost:3000
+```
+
+### Step 2: Run Flutter App
+
+**Web**
+```bash
+cd luni_app
 flutter run -d chrome
 ```
 
-### iOS
+**iOS**
 ```bash
+cd luni_app
 flutter run -d ios
 ```
 
-### Android
+**Android**
 ```bash
+cd luni_app
 flutter run -d android
 ```
 
@@ -164,9 +212,23 @@ flutter test
 
 ## 📚 Documentation
 
-- [PLAID_INTEGRATION_GUIDE.md](luni_app/PLAID_INTEGRATION_GUIDE.md) - Plaid integration details
-- [AUTHENTICATION_FIX_SUMMARY.md](luni_app/AUTHENTICATION_FIX_SUMMARY.md) - Authentication setup
-- [GOOGLE_SIGNIN_COMPLETE_GUIDE.md](luni_app/GOOGLE_SIGNIN_COMPLETE_GUIDE.md) - Google Sign-In guide
+### Architecture & Setup
+- **[ARCHITECTURE_SUMMARY.md](ARCHITECTURE_SUMMARY.md)** - ⭐ Architecture overview
+- **[BACKEND_MIGRATION_GUIDE.md](BACKEND_MIGRATION_GUIDE.md)** - ⭐ Backend setup guide
+- **[backend/README.md](backend/README.md)** - Backend API documentation
+- **[ENV_TEMPLATE.md](luni_app/ENV_TEMPLATE.md)** - Environment variables
+
+### Security
+- **[SUPABASE_KEY_SECURITY.md](SUPABASE_KEY_SECURITY.md)** - Key security best practices
+- **[SECURITY_INCIDENT_RESPONSE.md](SECURITY_INCIDENT_RESPONSE.md)** - Security notes
+
+### Integration Guides
+- [PLAID_INTEGRATION_GUIDE.md](luni_app/PLAID_INTEGRATION_GUIDE.md) - Plaid integration
+- [PLAID_CREDENTIALS_SETUP.md](luni_app/PLAID_CREDENTIALS_SETUP.md) - Plaid setup
+- [SUPABASE_SETUP_INSTRUCTIONS.md](luni_app/SUPABASE_SETUP_INSTRUCTIONS.md) - Supabase setup
+- [GOOGLE_SIGNIN_COMPLETE_GUIDE.md](luni_app/GOOGLE_SIGNIN_COMPLETE_GUIDE.md) - Google Sign-In
+
+### Design & Features
 - [FIGMA_INTEGRATION_GUIDE.md](luni_app/FIGMA_INTEGRATION_GUIDE.md) - Design system
 - [Product Documentation](Product/) - Feature specifications
 
