@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Plaid Link</title>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .logo {
+            width: 120px;
+            height: 40px;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        .button {
+            width: 100%;
+            background: #EAB308;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .button:hover {
+            background: #D97706;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+            margin-top: 16px;
+        }
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #EAB308;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 120 40" fill="#333">
+                    <rect x="10" y="10" width="100" height="20" rx="4" fill="none" stroke="#EAB308" stroke-width="2"/>
+                    <text x="60" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">PLAID</text>
+                </svg>
+            </div>
+            <div class="title">Connect Your Bank</div>
+            <div class="subtitle">Securely connect your bank account to automatically track transactions</div>
+        </div>
+        
+        <button id="linkButton" class="button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            Connect Bank Account
+        </button>
+        
+        <button id="demoButton" class="button" style="background: transparent; color: #EAB308; border: 1px solid #EAB308;">
+            Use Demo Account (for testing)
+        </button>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            Connecting to your bank...
+        </div>
+        
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        // Configuration - In production, these would come from your backend
+        const PLAID_CONFIG = {
+            environment: 'sandbox', // or 'development', 'production'
+            clientName: 'Luni App',
+            products: ['transactions'],
+            countryCodes: ['US', 'CA'],
+            language: 'en',
+            // In production, you'd get this from your backend
+            linkToken: 'link-sandbox-demo-token'
+        };
+
+        let linkHandler = null;
+
+        // Initialize Plaid Link
+        function initializePlaid() {
+            try {
+                linkHandler = Plaid.create({
+                    token: PLAID_CONFIG.linkToken,
+                    onSuccess: (public_token, metadata) => {
+                        console.log('Plaid Link Success:', public_token, metadata);
+                        
+                        // Send success message to Flutter
+                        if (window.flutter_inappwebview) {
+                            window.flutter_inappwebview.callHandler('plaidSuccess', {
+                                public_token: public_token,
+                                metadata: metadata
+                            });
+                        } else {
+                            // Fallback for testing
+                            alert('Bank connected successfully! Public token: ' + public_token);
+                        }
+                    },
+                    onExit: (err, metadata) => {
+                        console.log('Plaid Link Exit:', err, metadata);
+                        
+                        if (err) {
+                            showError('Connection failed: ' + err.error_message);
+                        } else {
+                            // Send exit message to Flutter
+                            if (window.flutter_inappwebview) {
+                                window.flutter_inappwebview.callHandler('plaidExit', {
+                                    error: err,
+                                    metadata: metadata
+                                });
+                            }
+                        }
+                    },
+                    onEvent: (eventName, metadata) => {
+                        console.log('Plaid Link Event:', eventName, metadata);
+                        
+                        // Send event to Flutter
+                        if (window.flutter_inappwebview) {
+                            window.flutter_inappwebview.callHandler('plaidEvent', {
+                                event: eventName,
+                                metadata: metadata
+                            });
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing Plaid:', error);
+                showError('Failed to initialize Plaid Link: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('linkButton').disabled = true;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('linkButton').disabled = false;
+        }
+
+        // Event listeners
+        document.getElementById('linkButton').addEventListener('click', () => {
+            hideError();
+            showLoading();
+            
+            try {
+                if (linkHandler) {
+                    linkHandler.open();
+                } else {
+                    throw new Error('Plaid Link not initialized');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('Failed to open Plaid Link: ' + error.message);
+            }
+        });
+
+        document.getElementById('demoButton').addEventListener('click', () => {
+            hideError();
+            showLoading();
+            
+            // Simulate demo connection
+            setTimeout(() => {
+                hideLoading();
+                
+                // Send demo success to Flutter
+                if (window.flutter_inappwebview) {
+                    window.flutter_inappwebview.callHandler('plaidSuccess', {
+                        public_token: 'demo_public_token',
+                        metadata: {
+                            institution: { name: 'Demo Bank' },
+                            accounts: [
+                                { name: 'Demo Checking', type: 'depository', subtype: 'checking' },
+                                { name: 'Demo Savings', type: 'depository', subtype: 'savings' }
+                            ]
+                        }
+                    });
+                } else {
+                    alert('Demo bank connected successfully!');
+                }
+            }, 2000);
+        });
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializePlaid();
+        });
+    </script>
+</body>
+</html>

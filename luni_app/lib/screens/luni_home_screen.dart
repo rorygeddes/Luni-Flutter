@@ -1,0 +1,853 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../providers/app_provider.dart';
+import '../providers/transaction_provider.dart';
+import '../services/navigation_service.dart';
+import '../services/auth_service.dart';
+import '../models/user_model.dart';
+import 'budget_modal.dart';
+import 'wallet_modal.dart';
+import 'daily_report_modal.dart';
+import 'bank_connection_screen.dart';
+import 'transaction_queue_screen.dart';
+import '../services/plaid_service.dart';
+import '../services/skeleton_data_service.dart';
+import 'onboarding/onboarding_flow_screen.dart';
+import 'main_layout.dart';
+
+class LuniHomeScreen extends StatelessWidget {
+  const LuniHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white, // White background for seamless scrolling
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Greeting Section
+            _buildGreetingSection(context),
+            SizedBox(height: 16.h),
+
+            // Survey Section
+            _buildSurveySection(context),
+            SizedBox(height: 16.h),
+
+            // Bank Connection Section
+            _buildBankConnectionSection(context),
+            SizedBox(height: 16.h),
+
+            // Transaction Queue Section
+            _buildTransactionQueueSection(context),
+            SizedBox(height: 16.h),
+
+            // Daily Report Button
+            _buildDailyReportButton(context),
+            SizedBox(height: 16.h),
+
+            // Current Budget Overview (Clickable)
+            GestureDetector(
+              onTap: () => NavigationService.navigateToModal(const BudgetModal()),
+              child: _buildBudgetOverview(),
+            ),
+            SizedBox(height: 16.h),
+
+            // Current Wallet & Accounts (Clickable)
+            GestureDetector(
+              onTap: () => NavigationService.navigateToModal(const WalletModal()),
+              child: _buildWalletSection(),
+            ),
+            SizedBox(height: 24.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGreetingSection(BuildContext context) {
+    return FutureBuilder<UserModel?>(
+      future: AuthService.getCurrentUserProfile(),
+      builder: (context, snapshot) {
+        String userName = 'Student';
+        String userEmail = '';
+        
+        // Debug information
+        if (snapshot.hasError) {
+          print('Error loading profile: ${snapshot.error}');
+          userName = 'Error loading profile';
+        } else if (snapshot.connectionState == ConnectionState.waiting) {
+          userName = 'Loading...';
+        } else if (snapshot.hasData && snapshot.data != null) {
+          userName = snapshot.data!.fullName ?? 'Student';
+          userEmail = snapshot.data!.email ?? '';
+          print('Profile loaded: ${snapshot.data!.fullName} (${snapshot.data!.email})');
+        } else {
+          print('No profile data found');
+          userName = 'No profile found';
+        }
+        
+        return Container(
+          padding: EdgeInsets.symmetric(vertical: 16.h),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back,',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      '$userName!',
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    if (userEmail.isNotEmpty) ...[
+                      SizedBox(height: 4.h),
+                      Text(
+                        userEmail,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: 8.w),
+              _buildStatCard('0', Icons.local_fire_department, () => _showPointsModal(context, 'Streak', '0', Icons.local_fire_department)),
+              SizedBox(width: 8.w),
+              _buildStatCard('0', Icons.star, () => _showPointsModal(context, 'LoonScore', '0', Icons.star)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSurveySection(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.quiz,
+                color: const Color(0xFFEAB308),
+                size: 24.w,
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                'Complete Your Profile',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'Help us personalize your experience by completing a quick survey about your financial goals and preferences.',
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const OnboardingFlowScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.quiz),
+              label: const Text('Complete Survey!'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEAB308),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String value, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8D777),
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.black,
+              size: 20.w,
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPointsModal(BuildContext context, String title, String value, IconData icon) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.5, // Reduced height to prevent overflow
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.r),
+            topRight: Radius.circular(20.r),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              width: 40.w,
+              height: 4.h,
+              margin: EdgeInsets.only(top: 8.h, bottom: 16.h),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(2.r),
+              ),
+            ),
+            
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 32.w,
+                      height: 32.h,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close,
+                        color: Colors.black,
+                        size: 20.w,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            SizedBox(height: 20.h), // Reduced spacing
+            
+            // Content - Made scrollable to prevent overflow
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(height: 20.h),
+                    Icon(
+                      icon,
+                      size: 60.w, // Reduced icon size
+                      color: const Color(0xFFEAB308),
+                    ),
+                    SizedBox(height: 16.h), // Reduced spacing
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 36.sp, // Reduced font size
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    SizedBox(height: 12.h), // Reduced spacing
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 18.sp, // Reduced font size
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    SizedBox(height: 16.h), // Reduced spacing
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h), // Reduced padding
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: Text(
+                        'Detailed view coming soon!',
+                        style: TextStyle(
+                          fontSize: 12.sp, // Reduced font size
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20.h), // Bottom padding
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBankConnectionSection(BuildContext context) {
+    final hasAccounts = SkeletonDataService.hasConnectedAccounts();
+        
+    return Container(
+          padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    hasAccounts ? Icons.account_balance_wallet : Icons.account_balance,
+                    color: hasAccounts ? Colors.green : const Color(0xFFEAB308),
+                    size: 24.w,
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    hasAccounts ? 'Bank Connected' : 'Bank Connection',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                hasAccounts 
+                  ? 'Your bank accounts are connected. View transactions and manage your finances.'
+                  : 'Connect your bank accounts to automatically track transactions and categorize your spending.',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const BankConnectionScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(hasAccounts ? Icons.visibility : Icons.link),
+                  label: Text(hasAccounts ? 'View Accounts' : 'Connect Bank Account'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: hasAccounts ? Colors.green : const Color(0xFFEAB308),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+  }
+
+  void _connectBankAccount(BuildContext context) {
+    PlaidService.launchPlaidLink(
+      onSuccess: (publicToken) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bank account connected successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Refresh the page to update the UI
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const MainLayout(currentRoute: '/'),
+          ),
+        );
+      },
+      onExit: (error) {
+        if (error.contains('User cancelled')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bank connection cancelled'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      onEvent: (event) {
+        print('Plaid event: $event');
+      },
+    );
+  }
+
+  Widget _buildTransactionQueueSection(BuildContext context) {
+    final hasAccounts = SkeletonDataService.hasConnectedAccounts();
+    final queueCount = SkeletonDataService.getQueuedTransactionsCount();
+    
+    if (!hasAccounts || queueCount == 0) {
+      return const SizedBox.shrink(); // Don't show queue section if no accounts or no queue items
+    }
+
+    return Container(
+          padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.queue,
+                    color: Colors.orange.shade600,
+                    size: 24.w,
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    'Transaction Queue',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Text(
+                      '$queueCount',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'Review and categorize your recent transactions with AI assistance.',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const TransactionQueueScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.rate_review),
+                  label: const Text('Review Transactions'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+  }
+
+  Widget _buildDailyReportButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => NavigationService.navigateToModal(const DailyReportModal()),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(vertical: 16.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade200,
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            'View Daily Report',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBudgetOverview() {
+    return Container(
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Budget Overview',
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.trending_up,
+                  size: 48.w,
+                  color: Colors.grey.shade400,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'Connect your bank account to see your budget insights',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBudgetItem(String amount, String label, String subtitle, double progress, Color backgroundColor) {
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 10.sp,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: Colors.green.shade400,
+              borderRadius: BorderRadius.circular(2.r),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green.shade600,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(String category, String amount, double progress, Color backgroundColor) {
+    return Container(
+      padding: EdgeInsets.all(8.w),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          Text(
+            category,
+            style: TextStyle(
+              fontSize: 10.sp,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Container(
+            height: 3.h,
+            decoration: BoxDecoration(
+              color: Colors.green.shade400,
+              borderRadius: BorderRadius.circular(1.5.r),
+            ),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: progress,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green.shade600,
+                  borderRadius: BorderRadius.circular(1.5.r),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletSection() {
+    return Container(
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Account Balances',
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.account_balance_wallet,
+                  size: 48.w,
+                  color: Colors.grey.shade400,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'Connect your bank account to see your balances',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey.shade600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountBubble(String amount, String account, Color backgroundColor) {
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        children: [
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: _getTextColorForBackground(backgroundColor),
+            ),
+          ),
+          Text(
+            account,
+            style: TextStyle(
+              fontSize: 10.sp,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getTextColorForBackground(Color backgroundColor) {
+    if (backgroundColor == Colors.blue.shade100) return Colors.blue.shade800;
+    if (backgroundColor == Colors.red.shade100) return Colors.red.shade800;
+    if (backgroundColor == Colors.green.shade100) return Colors.green.shade800;
+    if (backgroundColor == Colors.purple.shade100) return Colors.purple.shade800;
+    if (backgroundColor == Colors.orange.shade100) return Colors.orange.shade800;
+    return Colors.black;
+  }
+}
