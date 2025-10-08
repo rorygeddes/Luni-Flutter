@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import 'auth/sign_in_screen.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -772,6 +773,7 @@ class _ProfileViewState extends State<ProfileView> {
                         
                         _buildSettingsSection('Account', [
                           _buildSettingsItem('Change Password', Icons.lock, null, null, onTap: _changePassword),
+                          _buildSettingsItem('Sign Out', Icons.logout, null, null, onTap: _signOut),
                           _buildSettingsItem('Delete Account', Icons.delete, null, null, onTap: _deleteAccount, isDestructive: true),
                         ]),
                         SizedBox(height: 40.h),
@@ -908,5 +910,81 @@ class _ProfileViewState extends State<ProfileView> {
         ],
       ),
     );
+  }
+
+  void _signOut() async {
+    Navigator.of(context).pop(); // Close settings modal
+    
+    // Show confirmation dialog
+    final shouldSignOut = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out? All your data will be saved automatically.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSignOut == true) {
+      try {
+        // Show loading indicator
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+
+        // Note: All user data is automatically saved to Supabase as transactions occur
+        // No additional save operations needed before sign out
+        
+        // Sign out from Supabase
+        await AuthService.signOut();
+        
+        // Close loading dialog
+        if (mounted) Navigator.of(context).pop();
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Signed out successfully. All your data has been saved.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Navigate to sign in screen by replacing the entire navigation stack
+          // This ensures the user is taken to the sign-in screen
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const SignInScreen()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        // Close loading dialog if still open
+        if (mounted) Navigator.of(context).pop();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error signing out: $e'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
   }
 }
