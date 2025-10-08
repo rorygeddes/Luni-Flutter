@@ -177,13 +177,36 @@ class PlaidService {
     }
   }
 
-  // Get user's accounts from database
+  // Get user's accounts from database (including "All" account)
   static Future<List<AccountModel>> getAccounts() async {
     try {
+      // Get regular accounts
       final accountsData = await BackendService.getAccounts();
-      return accountsData.map((data) => AccountModel.fromJson(data)).toList();
+      List<AccountModel> accounts = accountsData.map((data) => AccountModel.fromJson(data)).toList();
+      
+      print('🏦 PlaidService: Loaded ${accounts.length} regular accounts');
+      for (final account in accounts) {
+        print('  - ${account.name}: \$${account.balance} (${account.type})');
+      }
+      
+      // Get "All" account with combined balance
+      try {
+        final allAccountData = await BackendService.getAllAccount();
+        final allAccount = AccountModel.fromJson(allAccountData);
+        
+        print('💰 PlaidService: Created "All" account with balance \$${allAccount.balance}');
+        
+        // Add "All" account at the beginning
+        accounts.insert(0, allAccount);
+      } catch (e) {
+        print('⚠️  PlaidService: Could not create "All" account: $e');
+        print('📊 PlaidService: Returning ${accounts.length} regular accounts only');
+      }
+      
+      print('📊 PlaidService: Returning ${accounts.length} total accounts (including "All")');
+      return accounts;
     } catch (e) {
-      print('Error getting accounts: $e');
+      print('❌ Error getting accounts: $e');
       return [];
     }
   }

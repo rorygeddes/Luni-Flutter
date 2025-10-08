@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../models/account_model.dart';
+import '../models/transaction_model.dart';
 import '../services/backend_service.dart';
 
 class AccountDetailScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class AccountDetailScreen extends StatefulWidget {
 }
 
 class _AccountDetailScreenState extends State<AccountDetailScreen> {
-  List<Map<String, dynamic>> _transactions = [];
+  List<TransactionModel> _transactions = [];
   bool _isLoading = true;
 
   @override
@@ -29,10 +30,18 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   Future<void> _loadTransactions() async {
     setState(() => _isLoading = true);
     try {
-      final transactions = await BackendService.getTransactionsByAccount(widget.account.id);
+      List<Map<String, dynamic>> transactionsData;
+      
+      // Handle "All" account specially
+      if (widget.account.id == 'all_accounts') {
+        transactionsData = await BackendService.getAllAccountTransactions();
+      } else {
+        transactionsData = await BackendService.getTransactionsByAccount(widget.account.id);
+      }
+      
       if (mounted) {
         setState(() {
-          _transactions = transactions;
+          _transactions = transactionsData.map((e) => TransactionModel.fromJson(e)).toList();
           _isLoading = false;
         });
       }
@@ -91,14 +100,43 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   ),
                 ),
                 SizedBox(height: 8.h),
+                // Primary balance (CAD)
                 Text(
-                  '\$${widget.account.balance.abs().toStringAsFixed(2)}',
+                  _formatBalanceForDisplay(widget.account),
                   style: TextStyle(
                     fontSize: 36.sp,
                     fontWeight: FontWeight.bold,
-                    color: widget.account.balance < 0 ? Colors.red : Colors.green.shade700,
+                    color: _getBalanceColor(widget.account),
                   ),
                 ),
+                Text(
+                  'CAD',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                // Show original currency balance if different from CAD
+                if (_shouldShowOriginalBalance(widget.account)) ...[
+                  SizedBox(height: 8.h),
+                  Text(
+                    _formatOriginalBalanceForDisplay(widget.account),
+                    style: TextStyle(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  Text(
+                    widget.account.currency,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
                 SizedBox(height: 8.h),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
@@ -208,13 +246,13 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     );
   }
 
-  Widget _buildTransactionCard(Map<String, dynamic> transaction) {
-    final amount = (transaction['amount'] ?? 0.0).toDouble();
-    final isCategorized = transaction['is_categorized'] == true;
-    final description = transaction['description'] ?? 'Unknown';
-    final date = DateTime.tryParse(transaction['date'] ?? '') ?? DateTime.now();
-    final category = transaction['category'];
-    final subcategory = transaction['subcategory'];
+  Widget _buildTransactionCard(TransactionModel transaction) {
+    final amount = transaction.amount;
+    final isCategorized = transaction.category != null && transaction.subcategory != null;
+    final description = transaction.description;
+    final date = transaction.date;
+    final category = transaction.category;
+    final subcategory = transaction.subcategory;
 
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
@@ -340,6 +378,54 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         ],
       ),
     );
+  }
+
+  // Format balance for display - show credit card debt as positive numbers
+  String _formatBalanceForDisplay(AccountModel account) {
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard && account.balance < 0) {
+      // For credit cards, show debt as positive number
+      return '\$${(-account.balance).toStringAsFixed(2)}';
+    } else {
+      // For other accounts, show balance as-is
+      return '\$${account.balance.toStringAsFixed(2)}';
+    }
+  }
+
+  // Get color for balance display
+  Color _getBalanceColor(AccountModel account) {
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard) {
+      // Credit cards always show in red (debt)
+      return Colors.red;
+    } else {
+      // Checking/savings accounts: green for positive, red for negative
+      return account.balance >= 0 ? Colors.green.shade700 : Colors.red;
+    }
+  }
+
+  // Check if we should show the original balance (for non-CAD accounts)
+  bool _shouldShowOriginalBalance(AccountModel account) {
+    return account.currency != 'CAD' && 
+           account.originalBalance != null && 
+           account.originalBalance != account.balance;
+  }
+
+  // Format the original balance for display
+  String _formatOriginalBalanceForDisplay(AccountModel account) {
+    if (account.originalBalance == null) return '';
+    
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard && account.originalBalance! < 0) {
+      // For credit cards, show debt as positive number
+      return '\$${(-account.originalBalance!).toStringAsFixed(2)}';
+    } else {
+      // For other accounts, show balance as-is
+      return '\$${account.originalBalance!.toStringAsFixed(2)}';
+    }
   }
 }
 

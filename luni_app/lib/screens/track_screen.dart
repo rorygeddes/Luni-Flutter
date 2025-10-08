@@ -212,6 +212,9 @@ class _TrackScreenState extends State<TrackScreen> {
   }
 
   Widget _buildAccountCard(AccountModel account) {
+    // Special styling for "All" account
+    final isAllAccount = account.id == 'all_accounts';
+    
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -224,11 +227,12 @@ class _TrackScreenState extends State<TrackScreen> {
         margin: EdgeInsets.only(bottom: 12.h),
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isAllAccount ? const Color(0xFFEAB308).withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(12.r),
+          border: isAllAccount ? Border.all(color: const Color(0xFFEAB308), width: 2) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.shade200,
+              color: isAllAccount ? const Color(0xFFEAB308).withOpacity(0.2) : Colors.grey.shade200,
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -240,12 +244,18 @@ class _TrackScreenState extends State<TrackScreen> {
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: account.type == 'credit' ? Colors.red.shade100 : Colors.green.shade100,
+              color: isAllAccount 
+                  ? const Color(0xFFEAB308).withOpacity(0.2)
+                  : account.type == 'credit' ? Colors.red.shade100 : Colors.green.shade100,
               borderRadius: BorderRadius.circular(20.r),
             ),
             child: Icon(
-              account.type == 'credit' ? Icons.credit_card : Icons.account_balance,
-              color: account.type == 'credit' ? Colors.red.shade600 : Colors.green.shade600,
+              isAllAccount 
+                  ? Icons.account_balance_wallet
+                  : account.type == 'credit' ? Icons.credit_card : Icons.account_balance,
+              color: isAllAccount 
+                  ? const Color(0xFFEAB308)
+                  : account.type == 'credit' ? Colors.red.shade600 : Colors.green.shade600,
               size: 20.w,
             ),
           ),
@@ -263,7 +273,9 @@ class _TrackScreenState extends State<TrackScreen> {
                   ),
                 ),
                 Text(
-                  '${account.type} • ${account.subtype}',
+                  isAllAccount 
+                      ? 'Combined Balance'
+                      : '${account.type} • ${account.subtype}',
                   style: TextStyle(
                     fontSize: 12.sp,
                     color: Colors.grey.shade600,
@@ -272,14 +284,48 @@ class _TrackScreenState extends State<TrackScreen> {
               ],
             ),
           ),
-          Text(
-            '\$${account.balance.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
-              color: account.balance < 0 ? Colors.red : Colors.green,
-            ),
-          ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Primary balance (CAD)
+                    Text(
+                      _formatBalanceForDisplay(account),
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: _getBalanceColor(account, isAllAccount),
+                      ),
+                    ),
+                    Text(
+                      'CAD',
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    // Show original currency balance if different from CAD
+                    if (_shouldShowOriginalBalance(account)) ...[
+                      SizedBox(height: 4.h),
+                      Text(
+                        _formatOriginalBalanceForDisplay(account),
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      Text(
+                        account.currency,
+                        style: TextStyle(
+                          fontSize: 9.sp,
+                          color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
         ],
       ),
       ),
@@ -634,6 +680,64 @@ class _TrackScreenState extends State<TrackScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  // Format balance for display - show credit card debt as positive numbers
+  String _formatBalanceForDisplay(AccountModel account) {
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard && account.balance < 0) {
+      // For credit cards, show debt as positive number
+      return '\$${(-account.balance).toStringAsFixed(2)}';
+    } else {
+      // For other accounts, show balance as-is
+      return '\$${account.balance.toStringAsFixed(2)}';
+    }
+  }
+
+  // Get color for balance display
+  Color _getBalanceColor(AccountModel account, bool isAllAccount) {
+    if (isAllAccount) {
+      return const Color(0xFFEAB308);
+    }
+    
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard) {
+      // Credit cards always show in red (debt)
+      return Colors.red;
+    } else {
+      // Checking/savings accounts: green for positive, red for negative
+      return account.balance >= 0 ? Colors.green : Colors.red;
+    }
+  }
+
+  // Get display currency - show CAD for converted accounts
+  String _getDisplayCurrency(AccountModel account) {
+    // All balances are now converted to CAD for display
+    return 'CAD';
+  }
+
+  // Check if we should show the original balance (for non-CAD accounts)
+  bool _shouldShowOriginalBalance(AccountModel account) {
+    return account.currency != 'CAD' && 
+           account.originalBalance != null && 
+           account.originalBalance != account.balance;
+  }
+
+  // Format the original balance for display
+  String _formatOriginalBalanceForDisplay(AccountModel account) {
+    if (account.originalBalance == null) return '';
+    
+    final isCreditCard = account.type == 'credit' || account.subtype == 'credit card';
+    
+    if (isCreditCard && account.originalBalance! < 0) {
+      // For credit cards, show debt as positive number
+      return '\$${(-account.originalBalance!).toStringAsFixed(2)}';
+    } else {
+      // For other accounts, show balance as-is
+      return '\$${account.originalBalance!.toStringAsFixed(2)}';
     }
   }
 }

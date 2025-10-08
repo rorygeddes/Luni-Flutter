@@ -13,6 +13,14 @@ class AccountModel {
   final String type;
   final String? subtype;
   final double balance;
+  @JsonKey(defaultValue: 'CAD')
+  final String currency;
+  @JsonKey(name: 'opening_balance', defaultValue: 0.0)
+  final double openingBalance;
+  @JsonKey(name: 'opening_balance_date')
+  final DateTime? openingBalanceDate;
+  @JsonKey(name: 'original_balance')
+  final double? originalBalance;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -24,6 +32,10 @@ class AccountModel {
     required this.type,
     this.subtype,
     required this.balance,
+    required this.currency,
+    required this.openingBalance,
+    this.openingBalanceDate,
+    this.originalBalance,
     required this.createdAt,
   });
 

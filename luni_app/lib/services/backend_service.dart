@@ -298,20 +298,33 @@ class BackendService {
       print('✅ Institution saved');
 
       // Save accounts
-      for (final account in accounts) {
-        final accountData = {
-          'id': account['account_id'],
-          'user_id': user.id,
-          'institution_id': institutionId,
-          'name': account['name'] ?? 'Unknown Account',
-          'type': account['type'] ?? 'depository',
-          'subtype': account['subtype'] ?? 'checking',
-          'balance': account['balances']?['current'] ?? 0.0,
-          'created_at': DateTime.now().toIso8601String(),
-        };
-        await supabase.from('accounts').upsert(accountData);
-        print('✅ Account saved: ${accountData['name']}');
-      }
+        for (final account in accounts) {
+          final currentBalance = account['balances']?['current'] ?? 0.0;
+          final accountType = account['type'] ?? 'depository';
+          final accountSubtype = account['subtype'] ?? 'checking';
+          
+          // For credit cards, make the balance negative (debt)
+          // For all accounts, ensure opening balance is set correctly
+          final isCreditCard = accountType == 'credit' || accountSubtype == 'credit card';
+          final adjustedBalance = isCreditCard && currentBalance > 0 ? -currentBalance : currentBalance;
+          final adjustedOpeningBalance = isCreditCard && currentBalance > 0 ? -currentBalance : currentBalance;
+          
+          final accountData = {
+            'id': account['account_id'],
+            'user_id': user.id,
+            'institution_id': institutionId,
+            'name': account['name'] ?? 'Unknown Account',
+            'type': accountType,
+            'subtype': accountSubtype,
+            'balance': adjustedBalance,
+            'currency': account['balances']?['iso_currency_code'] ?? 'CAD',
+            'opening_balance': adjustedOpeningBalance, // Set opening balance (negative for credit cards)
+            'opening_balance_date': DateTime.now().toIso8601String(), // Mark this as the starting point
+            'created_at': DateTime.now().toIso8601String(),
+          };
+          await supabase.from('accounts').upsert(accountData);
+          print('✅ Account saved: ${accountData['name']} (${isCreditCard ? 'Credit Card' : 'Depository'}) - Balance: \$${adjustedBalance}');
+        }
 
       // Save transactions (uncategorized)
       if (transactions.isEmpty) {
@@ -328,6 +341,7 @@ class BackendService {
               'user_id': user.id,
               'account_id': transaction['account_id'],
               'amount': (transaction['amount'] ?? 0.0) * -1, // Plaid uses positive for debits
+              'original_currency': transaction['iso_currency_code'] ?? 'CAD',
               'description': transaction['name'] ?? 'Unknown',
               'merchant_name': transaction['merchant_name'],
               'date': transaction['date'] ?? DateTime.now().toIso8601String().split('T')[0],
@@ -366,8 +380,40 @@ class BackendService {
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
-      print('📊 Loaded ${response.length} accounts from database');
-      return List<Map<String, dynamic>>.from(response);
+        // Calculate dynamic balance for each account with currency conversion
+        List<Map<String, dynamic>> accountsWithDynamicBalance = [];
+        String baseCurrency = 'CAD'; // Default base currency
+        
+        for (final account in response) {
+          String accountId = account['id'];
+          String accountCurrency = account['currency'] ?? 'CAD';
+          
+          print('🔍 DEBUG: Processing account ${account['name']} (ID: $accountId) with currency $accountCurrency');
+          
+          // Calculate dynamic balance in the account's original currency
+          double dynamicBalance = await calculateDynamicBalance(accountId, accountCurrency);
+          
+          print('🔍 Account ${account['name']}: balance=\$${dynamicBalance.toStringAsFixed(2)}, currency=$accountCurrency, baseCurrency=$baseCurrency');
+          
+          // Convert to CAD for display if needed
+          double balanceInCAD = dynamicBalance;
+          if (accountCurrency != baseCurrency) {
+            final exchangeRate = await getExchangeRate(accountCurrency, baseCurrency);
+            balanceInCAD = dynamicBalance * exchangeRate;
+            print('💱 Account ${account['name']}: \$${dynamicBalance.toStringAsFixed(2)} ${accountCurrency} → \$${balanceInCAD.toStringAsFixed(2)} ${baseCurrency} (rate: $exchangeRate)');
+          } else {
+            print('💰 Account ${account['name']}: No conversion needed (already in ${baseCurrency})');
+          }
+          
+          // Update the account with CAD balance for display
+          account['balance'] = balanceInCAD;
+          account['original_balance'] = dynamicBalance; // Keep original for reference
+          account['display_currency'] = baseCurrency; // Show CAD
+          accountsWithDynamicBalance.add(account);
+        }
+
+      print('📊 Loaded ${accountsWithDynamicBalance.length} accounts from database with dynamic balances');
+      return accountsWithDynamicBalance;
     } catch (e) {
       print('❌ Error getting accounts: $e');
       return [];
@@ -552,6 +598,7 @@ class BackendService {
                 'user_id': user.id,
                 'account_id': transaction['account_id'],
                 'amount': (transaction['amount'] ?? 0.0) * -1,
+                'original_currency': transaction['iso_currency_code'] ?? 'CAD',
                 'description': transaction['name'] ?? 'Unknown',
                 'merchant_name': transaction['merchant_name'],
                 'date': transaction['date'] ?? DateTime.now().toIso8601String().split('T')[0],
@@ -564,6 +611,12 @@ class BackendService {
               
               // Upsert (insert or update if exists)
               await supabase.from('transactions').upsert(transactionData);
+              
+              // Debug: Log new transactions
+              print('  📝 Saved transaction: ${transactionData['description']} (\$${transactionData['amount']}) on ${transactionData['date']}');
+              
+              // Balance will be dynamically calculated from opening_balance + new transactions
+              
               newCount++;
             } catch (e) {
               // Transaction might already exist, skip
@@ -657,6 +710,221 @@ class BackendService {
       print('✅ Category deleted: $categoryId');
     } catch (e) {
       print('❌ Error deleting category: $e');
+      throw e;
+    }
+  }
+
+  // Get exchange rate from API (free tier)
+  static Future<double> getExchangeRate(String fromCurrency, String toCurrency) async {
+    try {
+      if (fromCurrency == toCurrency) return 1.0;
+      
+      // Using a more reliable free exchange rate API
+      final response = await http.get(
+        Uri.parse('https://api.fxratesapi.com/latest?base=$fromCurrency&symbols=$toCurrency'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('🔍 DEBUG: Exchange rate API response: $data');
+        
+        // Check if the response has the expected structure
+        if (data != null && data['rates'] != null && data['rates'][toCurrency] != null) {
+          final rate = data['rates'][toCurrency];
+          print('💱 Exchange rate $fromCurrency to $toCurrency: $rate');
+          return rate.toDouble();
+        } else {
+          print('⚠️  Exchange rate API returned unexpected format: $data');
+        }
+      } else {
+        print('❌ Exchange rate API error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Error getting exchange rate: $e');
+    }
+    
+    // Fallback to a reasonable USD to CAD rate if API fails
+    if (fromCurrency == 'USD' && toCurrency == 'CAD') {
+      print('🔄 Using fallback USD to CAD rate: 1.37');
+      return 1.37;
+    }
+    
+    return 1.0; // Fallback to 1:1 for other currencies
+  }
+
+  // Calculate dynamic balance for an account based on opening balance + new transactions
+  static Future<double> calculateDynamicBalance(String accountId, String baseCurrency) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      print('🔍 DEBUG: Calculating balance for account $accountId with base currency $baseCurrency');
+      
+      // Get account info including opening balance and date
+      final accountResponse = await supabase
+          .from('accounts')
+          .select('currency, opening_balance, opening_balance_date, name')
+          .eq('id', accountId)
+          .single();
+      
+      final accountCurrency = accountResponse['currency'] ?? 'CAD';
+      double openingBalance = accountResponse['opening_balance'] ?? 0.0;
+      final openingBalanceDateStr = accountResponse['opening_balance_date'];
+      final accountName = accountResponse['name'] ?? 'Unknown';
+      
+      print('🔍 DEBUG: Raw data for $accountName - currency: $accountCurrency, opening_balance: $openingBalance, date: $openingBalanceDateStr');
+      
+      // Convert opening balance to base currency if needed
+      if (accountCurrency != baseCurrency) {
+        final exchangeRate = await getExchangeRate(accountCurrency, baseCurrency);
+        print('🔍 DEBUG: Converting $openingBalance $accountCurrency to $baseCurrency using rate $exchangeRate');
+        openingBalance = openingBalance * exchangeRate;
+        print('🔍 DEBUG: Converted opening balance: $openingBalance $baseCurrency');
+      } else {
+        print('🔍 DEBUG: No conversion needed - already in $baseCurrency');
+      }
+      
+      // If no opening balance date is set, return the opening balance only
+      if (openingBalanceDateStr == null) {
+        print('💰 Dynamic balance for account $accountId: \$${openingBalance.toStringAsFixed(2)} $baseCurrency (opening balance only, no date set)');
+        return openingBalance;
+      }
+      
+      DateTime openingBalanceDate;
+      try {
+        openingBalanceDate = DateTime.parse(openingBalanceDateStr);
+      } catch (e) {
+        print('⚠️  Invalid opening balance date for account $accountId: $openingBalanceDateStr');
+        print('💰 Dynamic balance for account $accountId: \$${openingBalance.toStringAsFixed(2)} $baseCurrency (opening balance only, invalid date)');
+        return openingBalance;
+      }
+      
+      // Get only transactions ON OR AFTER the opening balance date (applies to ALL account types)
+      // Use the date part only to ensure we include the full opening balance date
+      final openingDateOnly = openingBalanceDate.toIso8601String().split('T')[0];
+      final transactions = await supabase
+          .from('transactions')
+          .select('amount, original_currency, date')
+          .eq('account_id', accountId)
+          .gte('date', openingDateOnly); // Transactions on or after opening balance date
+      
+      print('🔍 Found ${transactions.length} transactions after opening balance date for account $accountId');
+      
+      double newTransactionsTotal = 0.0;
+      
+      for (final transaction in transactions) {
+        double amount = transaction['amount'] ?? 0.0;
+        String transactionCurrency = transaction['original_currency'] ?? accountCurrency;
+        
+        // Convert to base currency if needed
+        if (transactionCurrency != baseCurrency) {
+          final exchangeRate = await getExchangeRate(transactionCurrency, baseCurrency);
+          amount = amount * exchangeRate;
+        }
+        
+        newTransactionsTotal += amount;
+      }
+      
+      final totalBalance = openingBalance + newTransactionsTotal;
+      
+      // For credit cards, we want to maintain the negative balance internally
+      // but display positive numbers in red to the user
+      print('💰 Dynamic balance for account $accountId: \$${totalBalance.toStringAsFixed(2)} $baseCurrency');
+      print('   📊 Opening balance: \$${openingBalance.toStringAsFixed(2)} $baseCurrency');
+      print('   📈 New transactions: \$${newTransactionsTotal.toStringAsFixed(2)} $baseCurrency (${transactions.length} transactions)');
+      print('   🧮 Total: \$${openingBalance.toStringAsFixed(2)} + \$${newTransactionsTotal.toStringAsFixed(2)} = \$${totalBalance.toStringAsFixed(2)}');
+      return totalBalance;
+    } catch (e) {
+      print('❌ Error calculating dynamic balance: $e');
+      return 0.0;
+    }
+  }
+
+  // Get "All" account with combined balance and transactions
+  static Future<Map<String, dynamic>> getAllAccount() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get all accounts with currency info
+      final accounts = await supabase
+          .from('accounts')
+          .select('id, balance, type, subtype, currency, name')
+          .eq('user_id', user.id);
+          
+      print('🔍 BackendService: Found ${accounts.length} accounts for combined balance');
+
+      // Calculate combined balance with currency conversion
+      double combinedBalance = 0.0;
+      String baseCurrency = 'CAD'; // Default base currency
+      
+      for (final account in accounts) {
+        String accountId = account['id'];
+        String accountName = account['name'] ?? 'Unknown';
+        String accountType = account['type'] ?? 'depository';
+        String accountSubtype = account['subtype'] ?? 'checking';
+        String accountCurrency = account['currency'] ?? 'CAD';
+        
+        print('🔍 DEBUG: Processing account $accountName (ID: $accountId) for combined balance');
+        
+        // Calculate dynamic balance from transactions (already converted to CAD)
+        double dynamicBalanceInCAD = await calculateDynamicBalance(accountId, baseCurrency);
+        
+        print('  - Account $accountName: \$${dynamicBalanceInCAD.toStringAsFixed(2)} $baseCurrency (${accountType}/${accountSubtype}) [${accountCurrency}]');
+        
+        // The dynamic balance is already in CAD, so no additional conversion needed
+        // For credit cards, balance is negative (debt) - subtract from combined balance
+        // For checking/savings, balance is positive (money available) - add to combined balance
+        if (accountType == 'credit' || accountSubtype == 'credit card') {
+          combinedBalance += dynamicBalanceInCAD; // Credit card debt is negative, so this subtracts
+        } else {
+          combinedBalance += dynamicBalanceInCAD; // Checking/savings is positive, so this adds
+        }
+      }
+      
+      print('💰 BackendService: Combined balance = \$${combinedBalance.toStringAsFixed(2)} $baseCurrency');
+
+      // Get total transaction count
+      final transactionCount = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .count();
+
+      return {
+        'id': 'all_accounts',
+        'user_id': user.id,
+        'institution_id': 'combined_institution',
+        'name': 'All Accounts',
+        'type': 'combined',
+        'subtype': 'all',
+        'balance': combinedBalance,
+        'currency': baseCurrency,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      print('❌ Error getting all account: $e');
+      throw e;
+    }
+  }
+
+  // Get transactions for "All" account (from all accounts)
+  static Future<List<Map<String, dynamic>>> getAllAccountTransactions({int limit = 50}) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .order('date', ascending: false)
+          .limit(limit);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('❌ Error getting all account transactions: $e');
       throw e;
     }
   }
