@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../services/plaid_service.dart';
-import '../services/skeleton_data_service.dart';
 import '../models/account_model.dart';
 
 class BankConnectionScreen extends StatefulWidget {
@@ -23,20 +22,13 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
 
   Future<void> _loadAccounts() async {
     try {
-      // First try to load real accounts from database
-      final realAccounts = await PlaidService.getAccounts();
+      // Load real accounts from database
+      final accounts = await PlaidService.getAccounts();
       if (!mounted) return;
       
-      if (realAccounts.isNotEmpty) {
-        setState(() {
-          _accounts = realAccounts;
-        });
-      } else {
-        // Only show mock data if no real accounts exist
-        setState(() {
-          _accounts = [];
-        });
-      }
+      setState(() {
+        _accounts = accounts;
+      });
     } catch (e) {
       print('Error loading accounts: $e');
       if (!mounted) return;
@@ -155,41 +147,6 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
     }
   }
 
-  Future<void> _connectDemoBank() async {
-    setState(() => _isConnecting = true);
-
-    try {
-      // Simulate demo bank connection
-      await Future.delayed(const Duration(seconds: 2));
-      
-      if (!mounted) return;
-      setState(() => _isConnecting = false);
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Demo bank account connected successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Load demo accounts
-      _loadAccounts();
-      
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isConnecting = false);
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Demo connection error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -285,31 +242,6 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
                             ),
                           ],
                         ),
-                ),
-              ),
-              
-              SizedBox(height: 16.h),
-              
-              // Demo Button (for testing)
-              SizedBox(
-                width: double.infinity,
-                height: 48.h,
-                child: OutlinedButton(
-                  onPressed: _isConnecting ? null : _connectDemoBank,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFEAB308),
-                    side: BorderSide(color: const Color(0xFFEAB308)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Text(
-                    'Use Demo Account (for testing)',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
                 ),
               ),
               
@@ -430,71 +362,6 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
               fontSize: 16.sp,
               fontWeight: FontWeight.w600,
               color: account.balance < 0 ? Colors.red : Colors.green,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDemoAccountCard(String name, String type, double balance) {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40.w,
-            height: 40.w,
-            decoration: BoxDecoration(
-              color: balance < 0 ? Colors.red.shade100 : Colors.green.shade100,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Icon(
-              balance < 0 ? Icons.credit_card : Icons.account_balance,
-              color: balance < 0 ? Colors.red.shade600 : Colors.green.shade600,
-              size: 20.w,
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
-                ),
-                Text(
-                  type,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '\$${balance.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
-              color: balance < 0 ? Colors.red : Colors.green,
             ),
           ),
         ],

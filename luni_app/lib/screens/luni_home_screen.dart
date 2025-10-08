@@ -6,14 +6,15 @@ import '../providers/app_provider.dart';
 import '../providers/transaction_provider.dart';
 import '../services/navigation_service.dart';
 import '../services/auth_service.dart';
+import '../services/backend_service.dart';
 import '../models/user_model.dart';
 import 'budget_modal.dart';
 import 'wallet_modal.dart';
 import 'daily_report_modal.dart';
 import 'bank_connection_screen.dart';
 import 'transaction_queue_screen.dart';
+import 'categories_screen.dart';
 import '../services/plaid_service.dart';
-import '../services/skeleton_data_service.dart';
 import 'onboarding/onboarding_flow_screen.dart';
 import 'main_layout.dart';
 
@@ -43,6 +44,10 @@ class LuniHomeScreen extends StatelessWidget {
 
             // Transaction Queue Section
             _buildTransactionQueueSection(context),
+            SizedBox(height: 16.h),
+
+            // Category Spending Section
+            _buildCategorySpendingSection(context),
             SizedBox(height: 16.h),
 
             // Daily Report Button
@@ -359,7 +364,8 @@ class LuniHomeScreen extends StatelessWidget {
   }
 
   Widget _buildBankConnectionSection(BuildContext context) {
-    final hasAccounts = SkeletonDataService.hasConnectedAccounts();
+    // Check if user has connected accounts using FutureBuilder
+    // For now, we'll show the connect button (real check would be async)
         
     return Container(
           padding: EdgeInsets.all(20.w),
@@ -380,13 +386,13 @@ class LuniHomeScreen extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    hasAccounts ? Icons.account_balance_wallet : Icons.account_balance,
-                    color: hasAccounts ? Colors.green : const Color(0xFFEAB308),
+                    Icons.account_balance,
+                    color: const Color(0xFFEAB308),
                     size: 24.w,
                   ),
                   SizedBox(width: 12.w),
                   Text(
-                    hasAccounts ? 'Bank Connected' : 'Bank Connection',
+                    'Bank Connection',
                     style: TextStyle(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.bold,
@@ -397,9 +403,7 @@ class LuniHomeScreen extends StatelessWidget {
               ),
               SizedBox(height: 16.h),
               Text(
-                hasAccounts 
-                  ? 'Your bank accounts are connected. View transactions and manage your finances.'
-                  : 'Connect your bank accounts to automatically track transactions and categorize your spending.',
+                'Connect your bank accounts to automatically track transactions and categorize your spending.',
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: Colors.grey.shade600,
@@ -416,10 +420,10 @@ class LuniHomeScreen extends StatelessWidget {
                       ),
                     );
                   },
-                  icon: Icon(hasAccounts ? Icons.visibility : Icons.link),
-                  label: Text(hasAccounts ? 'View Accounts' : 'Connect Bank Account'),
+                  icon: const Icon(Icons.link),
+                  label: const Text('Connect Bank Account'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: hasAccounts ? Colors.green : const Color(0xFFEAB308),
+                    backgroundColor: const Color(0xFFEAB308),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r),
@@ -472,12 +476,9 @@ class LuniHomeScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionQueueSection(BuildContext context) {
-    final hasAccounts = SkeletonDataService.hasConnectedAccounts();
-    final queueCount = SkeletonDataService.getQueuedTransactionsCount();
-    
-    if (!hasAccounts || queueCount == 0) {
-      return const SizedBox.shrink(); // Don't show queue section if no accounts or no queue items
-    }
+    // Transaction queue will be shown based on real data from provider
+    // This section should use Consumer<TransactionProvider> for real-time updates
+    // For now, we'll show it if the user navigates to the queue screen
 
     return Container(
           padding: EdgeInsets.all(20.w),
@@ -519,7 +520,7 @@ class LuniHomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12.r),
                     ),
                     child: Text(
-                      '$queueCount',
+                      '0',
                       style: TextStyle(
                         fontSize: 12.sp,
                         fontWeight: FontWeight.w600,
@@ -849,5 +850,224 @@ class LuniHomeScreen extends StatelessWidget {
     if (backgroundColor == Colors.purple.shade100) return Colors.purple.shade800;
     if (backgroundColor == Colors.orange.shade100) return Colors.orange.shade800;
     return Colors.black;
+  }
+
+  Widget _buildCategorySpendingSection(BuildContext context) {
+    return FutureBuilder<Map<String, double>>(
+      future: BackendService.getCategorySpending(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final categories = snapshot.data!;
+        final totalSpending = categories.values.fold(0.0, (a, b) => a + b);
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const CategoriesScreen(),
+              ),
+            );
+          },
+          child: Container(
+          padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.pie_chart,
+                    color: const Color(0xFFEAB308),
+                    size: 24.w,
+                  ),
+                  SizedBox(width: 12.w),
+                  Text(
+                    'Category Spending',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Last 30 days • \$${totalSpending.toStringAsFixed(2)} total',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              ...categories.entries.map((entry) {
+                final percentage = (entry.value / totalSpending * 100).toStringAsFixed(1);
+                return _buildCategoryRow(
+                  entry.key,
+                  entry.value,
+                  percentage,
+                );
+              }).toList(),
+            ],
+          ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryRow(String category, double amount, String percentage) {
+    final categoryIcon = _getCategoryIcon(category);
+    final categoryColor = _getCategoryColor(category);
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: categoryColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: categoryColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36.w,
+            height: 36.w,
+            decoration: BoxDecoration(
+              color: categoryColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(18.r),
+            ),
+            child: Icon(
+              categoryIcon,
+              color: categoryColor,
+              size: 20.w,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getCategoryDisplayName(category),
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                Text(
+                  '$percentage%',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '\$${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+              color: categoryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+      case 'food_drink':
+        return Icons.restaurant;
+      case 'transportation':
+        return Icons.directions_car;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'entertainment':
+        return Icons.movie;
+      case 'bills':
+      case 'utilities':
+        return Icons.receipt;
+      case 'health':
+      case 'healthcare':
+        return Icons.favorite;
+      case 'education':
+        return Icons.school;
+      case 'travel':
+        return Icons.flight;
+      default:
+        return Icons.category;
+    }
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+      case 'food_drink':
+        return Colors.orange;
+      case 'transportation':
+        return Colors.blue;
+      case 'shopping':
+        return Colors.purple;
+      case 'entertainment':
+        return Colors.pink;
+      case 'bills':
+      case 'utilities':
+        return Colors.red;
+      case 'health':
+      case 'healthcare':
+        return Colors.green;
+      case 'education':
+        return Colors.indigo;
+      case 'travel':
+        return Colors.teal;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getCategoryDisplayName(String category) {
+    switch (category.toLowerCase()) {
+      case 'food_drink':
+        return 'Food & Drink';
+      case 'transportation':
+        return 'Transportation';
+      case 'shopping':
+        return 'Shopping';
+      case 'entertainment':
+        return 'Entertainment';
+      case 'bills':
+        return 'Bills & Utilities';
+      case 'utilities':
+        return 'Utilities';
+      case 'health':
+      case 'healthcare':
+        return 'Healthcare';
+      case 'education':
+        return 'Education';
+      case 'travel':
+        return 'Travel';
+      default:
+        return category.substring(0, 1).toUpperCase() + category.substring(1);
+    }
   }
 }

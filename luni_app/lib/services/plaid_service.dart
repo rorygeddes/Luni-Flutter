@@ -161,49 +161,63 @@ class PlaidService {
       print('Received ${data['accounts']?.length ?? 0} accounts');
       print('Received ${data['transactions']?.length ?? 0} transactions');
       
+      // Save Plaid data to Supabase
+      await BackendService.savePlaidData(
+        accessToken: data['access_token'] as String,
+        itemId: data['item_id'] as String,
+        accounts: data['accounts'] as List<dynamic>,
+        transactions: data['transactions'] as List<dynamic>,
+      );
+      
+      print('✅ Plaid data successfully saved to database');
+      
     } catch (e) {
       print('Error exchanging public token: $e');
       throw e;
     }
   }
 
-  // Note: All data saving is now handled by the backend
-  // The backend will save to Supabase using the SECRET key
-  // Frontend only needs to exchange tokens and display data
-
-  // Get user's accounts (mock data for now)
+  // Get user's accounts from database
   static Future<List<AccountModel>> getAccounts() async {
     try {
-      // TODO: Get accounts from backend API
-      // For now, return mock data
-      return [];
+      final accountsData = await BackendService.getAccounts();
+      return accountsData.map((data) => AccountModel.fromJson(data)).toList();
     } catch (e) {
       print('Error getting accounts: $e');
       return [];
     }
   }
 
-  // Get user's transactions (mock data for now)
+  // Get user's transactions from database
   static Future<List<TransactionModel>> getTransactions({int limit = 50}) async {
     try {
-      // TODO: Get transactions from backend API
-      // For now, return mock data
-      return [];
+      final transactionsData = await BackendService.getTransactions(limit: limit);
+      return transactionsData.map((data) => TransactionModel.fromJson(data)).toList();
     } catch (e) {
       print('Error getting transactions: $e');
       return [];
     }
   }
 
-  // Get pending transactions from queue (mock data for now)
-  static Future<List<QueueItemModel>> getQueuedTransactions({int limit = 5}) async {
+  // Get uncategorized transactions for the queue
+  static Future<List<Map<String, dynamic>>> getQueuedTransactions({int limit = 5}) async {
     try {
-      // TODO: Get transaction queue from backend API
-      // For now, return mock data
-      return [];
+      final queueData = await BackendService.getUncategorizedTransactions(limit: limit);
+      return queueData;
     } catch (e) {
       print('Error getting transaction queue: $e');
       return [];
+    }
+  }
+
+  // Check if user has connected accounts
+  static Future<bool> hasConnectedAccounts() async {
+    try {
+      final accounts = await getAccounts();
+      return accounts.isNotEmpty;
+    } catch (e) {
+      print('Error checking connected accounts: $e');
+      return false;
     }
   }
 }

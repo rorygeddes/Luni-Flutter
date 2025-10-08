@@ -14,6 +14,18 @@ class CategoriesSetupScreen extends StatefulWidget {
 class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
   final Map<String, List<String>> _customSubcategories = {};
   final Map<String, TextEditingController> _controllers = {};
+  
+  // Define parent categories locally (matches database schema)
+  static const Map<String, Map<String, dynamic>> _parentCategories = {
+    'living_essentials': {'name': 'Living Essentials', 'icon': '🏠'},
+    'education': {'name': 'Education', 'icon': '🎓'},
+    'food': {'name': 'Food', 'icon': '🍽️'},
+    'transportation': {'name': 'Transportation', 'icon': '🚌'},
+    'healthcare': {'name': 'Healthcare', 'icon': '💊'},
+    'entertainment': {'name': 'Entertainment', 'icon': '🎬'},
+    'vacation': {'name': 'Vacation', 'icon': '✈️'},
+    'income': {'name': 'Income', 'icon': '💰'},
+  };
 
   @override
   void initState() {
@@ -36,7 +48,7 @@ class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add to ${ParentCategories.categories[parentKey]!['name']}'),
+        title: Text('Add to ${_parentCategories[parentKey]!['name']}'),
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
@@ -105,12 +117,12 @@ class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
           
           Expanded(
             child: ListView.builder(
-              itemCount: ParentCategories.categories.length,
+              itemCount: _parentCategories.length,
               itemBuilder: (context, index) {
-                final entry = ParentCategories.categories.entries.elementAt(index);
+                final entry = _parentCategories.entries.elementAt(index);
                 final parentKey = entry.key;
                 final parentData = entry.value;
-                final defaultSubs = ParentCategories.subcategories[parentKey] ?? [];
+                final defaultSubs = <String>[]; // Default subcategories will be loaded from database
                 final customSubs = _customSubcategories[parentKey] ?? [];
                 
                 return Container(
@@ -176,7 +188,7 @@ class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
                                 borderRadius: BorderRadius.circular(12.r),
                               ),
                               child: Text(
-                                '${sub['emoji']} ${sub['name']}',
+                                sub, // sub is a String, not a Map
                                 style: TextStyle(
                                   fontSize: 12.sp,
                                   color: Colors.grey.shade700,

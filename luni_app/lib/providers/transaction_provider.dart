@@ -4,6 +4,7 @@ import '../models/category_model.dart';
 import '../models/transaction_model.dart';
 import '../services/plaid_service.dart';
 import '../services/openai_service.dart';
+import '../services/backend_service.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -25,21 +26,47 @@ class TransactionProvider extends ChangeNotifier {
       // Load categories first
       await _loadCategories();
       
-      // Load queued transactions
-      final queueItems = await PlaidService.getQueuedTransactions(limit: 5);
+      // Load uncategorized transactions directly from database
+      final queueData = await PlaidService.getQueuedTransactions(limit: 5);
       
       // Process each transaction with AI categorization
       final processedTransactions = <Map<String, dynamic>>[];
       
-      for (final queueItem in queueItems) {
-        // TODO: Get transaction data from queueItem.transactionId
-        // For now, skip processing since we don't have transaction data
-        continue;
+      for (final transactionData in queueData) {
+        // Get AI categorization using user's categories
+        final description = transactionData['description'] ?? 'Unknown';
+        final merchantName = transactionData['merchant_name'];
+        final amount = (transactionData['amount'] ?? 0.0).toDouble();
+        
+        // Simple keyword-based categorization (following old_method.md approach)
+        final aiResult = _categorizeWithKeywords(
+          description: description,
+          merchantName: merchantName,
+          amount: amount,
+          userCategories: _categories,
+        );
+        
+        // Add AI categorization to transaction data
+        final processedTransaction = {
+          'id': transactionData['id'],
+          'transaction_id': transactionData['id'],
+          'amount': transactionData['amount'],
+          'description': transactionData['description'],
+          'merchant_name': transactionData['merchant_name'],
+          'date': transactionData['date'],
+          'ai_description': aiResult['cleaned_description'] ?? transactionData['description'],
+          'ai_category': aiResult['category'] ?? 'other',
+          'ai_subcategory': aiResult['subcategory'] ?? 'Other',
+          'confidence_score': aiResult['confidence'] ?? 0.5,
+          'status': 'pending',
+        };
+        
+        processedTransactions.add(processedTransaction);
       }
       
       _queuedTransactions = processedTransactions;
     } catch (e) {
-      // Handle error
+      print('Error loading queued transactions: $e');
       _queuedTransactions = [];
     } finally {
       _setLoading(false);
@@ -146,44 +173,60 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  // Submit all categorized transactions
+  // Submit categorized transaction
+  Future<void> submitTransaction({
+    required String transactionId,
+    required String category,
+    required String subcategory,
+    required String aiDescription,
+    bool isSplit = false,
+  }) async {
+    try {
+      // Update transaction using BackendService
+      await BackendService.updateTransactionCategory(
+        transactionId: transactionId,
+        category: category,
+        subcategory: subcategory,
+        aiDescription: aiDescription,
+        isSplit: isSplit,
+      );
+
+      // Remove from local queue
+      _queuedTransactions.removeWhere(
+        (item) => item['id'] == transactionId || item['transaction_id'] == transactionId,
+      );
+
+      notifyListeners();
+      
+      print('✅ Transaction submitted: $transactionId');
+    } catch (e) {
+      print('❌ Error submitting transaction: $e');
+      throw e;
+    }
+  }
+
+  // Submit all categorized transactions from current queue
   Future<void> submitCategorizedTransactions() async {
     try {
-      final transactionsToUpdate = <String, String>{};
-      
-      // Collect all transactions with selected categories
+      // Update all transactions in the queue
       for (final queueItem in _queuedTransactions) {
-        final transaction = queueItem['transactions'] as Map<String, dynamic>;
-        final transactionId = transaction['id'] as String;
-        final selectedCategoryId = transaction['selected_category_id'] as String?;
-        
-        if (selectedCategoryId != null) {
-          transactionsToUpdate[transactionId] = selectedCategoryId;
-        }
-      }
-
-      // Update all transactions in batch
-      for (final entry in transactionsToUpdate.entries) {
-        await _supabase
-            .from('transactions')
-            .update({'ai_category_id': entry.value})
-            .eq('id', entry.key);
-      }
-
-      // Mark queue items as done
-      final transactionIds = transactionsToUpdate.keys.toList();
-      if (transactionIds.isNotEmpty) {
-        await _supabase
-            .from('queue_items')
-            .update({'state': 'done'})
-            .inFilter('transaction_id', transactionIds);
+        await BackendService.updateTransactionCategory(
+          transactionId: queueItem['transaction_id'] ?? queueItem['id'],
+          category: queueItem['ai_category'] ?? 'other',
+          subcategory: queueItem['ai_subcategory'] ?? 'Other',
+          aiDescription: queueItem['ai_description'] ?? queueItem['description'],
+          isSplit: queueItem['is_split'] ?? false,
+        );
       }
 
       // Clear local queue
       _queuedTransactions.clear();
       notifyListeners();
+      
+      print('✅ All transactions submitted');
     } catch (e) {
-      // Handle error
+      print('❌ Error submitting transactions: $e');
+      throw e;
     }
   }
 
@@ -212,6 +255,145 @@ class TransactionProvider extends ChangeNotifier {
     } catch (e) {
       return [];
     }
+  }
+
+  // Categorize transaction with keywords (following old_method.md approach)
+  Map<String, dynamic> _categorizeWithKeywords({
+    required String description,
+    String? merchantName,
+    required double amount,
+    required List<CategoryModel> userCategories,
+  }) {
+    final text = '${description.toLowerCase()} ${merchantName?.toLowerCase() ?? ''}'.toLowerCase();
+    
+    // Keyword matching (similar to old_method.md _classify_transaction)
+    String? matchedParent;
+    String? matchedSubcategory;
+    double confidence = 0.5;
+
+    // Food keywords
+    if (text.contains('starbucks') || text.contains('coffee') || text.contains('cafe')) {
+      matchedParent = 'food';
+      matchedSubcategory = 'Coffee & Lunch Out';
+      confidence = 0.9;
+    } else if (text.contains('grocery') || text.contains('loblaws') || text.contains('walmart') || 
+               text.contains('supermarket') || text.contains('safeway')) {
+      matchedParent = 'food';
+      matchedSubcategory = 'Groceries';
+      confidence = 0.9;
+    } else if (text.contains('restaurant') || text.contains('pizza') || text.contains('burger') || 
+               text.contains('mcdonalds') || text.contains('subway')) {
+      matchedParent = 'food';
+      matchedSubcategory = 'Restaurants & Dinner';
+      confidence = 0.85;
+    }
+    // Transportation keywords
+    else if (text.contains('uber') || text.contains('lyft') || text.contains('taxi')) {
+      matchedParent = 'transportation';
+      matchedSubcategory = 'Rideshare';
+      confidence = 0.95;
+    } else if (text.contains('gas') || text.contains('petro') || text.contains('shell') || text.contains('esso')) {
+      matchedParent = 'transportation';
+      matchedSubcategory = 'Gas';
+      confidence = 0.9;
+    } else if (text.contains('transit') || text.contains('bus') || text.contains('metro') || text.contains('ttc')) {
+      matchedParent = 'transportation';
+      matchedSubcategory = 'Bus Pass';
+      confidence = 0.9;
+    }
+    // Entertainment keywords
+    else if (text.contains('netflix') || text.contains('spotify') || text.contains('disney') || 
+             text.contains('subscription')) {
+      matchedParent = 'entertainment';
+      matchedSubcategory = 'Subscriptions';
+      confidence = 0.9;
+    } else if (text.contains('movie') || text.contains('cinema') || text.contains('theatre')) {
+      matchedParent = 'entertainment';
+      matchedSubcategory = 'Events';
+      confidence = 0.85;
+    } else if (text.contains('amazon') || text.contains('shopping') || text.contains('zara') || 
+               text.contains('h&m')) {
+      matchedParent = 'entertainment';
+      matchedSubcategory = 'Shopping';
+      confidence = 0.8;
+    }
+    // Living Essentials keywords
+    else if (text.contains('rent') || text.contains('lease')) {
+      matchedParent = 'living_essentials';
+      matchedSubcategory = 'Rent';
+      confidence = 0.95;
+    } else if (text.contains('internet') || text.contains('wifi') || text.contains('rogers') || 
+               text.contains('bell')) {
+      matchedParent = 'living_essentials';
+      matchedSubcategory = 'Wifi';
+      confidence = 0.85;
+    } else if (text.contains('hydro') || text.contains('electric') || text.contains('utility')) {
+      matchedParent = 'living_essentials';
+      matchedSubcategory = 'Utilities';
+      confidence = 0.85;
+    }
+    // Education keywords
+    else if (text.contains('tuition') || text.contains('university') || text.contains('college')) {
+      matchedParent = 'education';
+      matchedSubcategory = 'Tuition';
+      confidence = 0.95;
+    } else if (text.contains('book') || text.contains('textbook')) {
+      matchedParent = 'education';
+      matchedSubcategory = 'Books';
+      confidence = 0.9;
+    }
+    // Healthcare keywords
+    else if (text.contains('gym') || text.contains('fitness') || text.contains('goodlife')) {
+      matchedParent = 'healthcare';
+      matchedSubcategory = 'Gym';
+      confidence = 0.9;
+    } else if (text.contains('pharmacy') || text.contains('drug') || text.contains('shoppers')) {
+      matchedParent = 'healthcare';
+      matchedSubcategory = 'Medication';
+      confidence = 0.85;
+    }
+    // Income keywords (positive amounts)
+    else if (amount > 0) {
+      if (text.contains('payroll') || text.contains('salary') || text.contains('wage')) {
+        matchedParent = 'income';
+        matchedSubcategory = 'Job Income';
+        confidence = 0.95;
+      } else if (text.contains('transfer') || text.contains('deposit')) {
+        matchedParent = 'income';
+        matchedSubcategory = 'Family Support';
+        confidence = 0.7;
+      } else {
+        matchedParent = 'income';
+        matchedSubcategory = 'Bonus';
+        confidence = 0.6;
+      }
+    }
+
+    // If no match found, default to "other"
+    if (matchedParent == null) {
+      matchedParent = 'other';
+      matchedSubcategory = 'Other';
+      confidence = 0.3;
+    }
+
+    // Clean up merchant name for display
+    String cleanedDescription = merchantName ?? description;
+    cleanedDescription = cleanedDescription
+        .replaceAll(RegExp(r'\*+'), '')
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .trim();
+    
+    // Capitalize first letter of each word
+    cleanedDescription = cleanedDescription.split(' ')
+        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1).toLowerCase())
+        .join(' ');
+
+    return {
+      'cleaned_description': cleanedDescription,
+      'category': matchedParent,
+      'subcategory': matchedSubcategory,
+      'confidence': confidence,
+    };
   }
 
   // Get monthly spending by category

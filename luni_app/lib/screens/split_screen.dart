@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../services/skeleton_data_service.dart';
 
 class SplitScreen extends StatelessWidget {
   const SplitScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final groups = SkeletonDataService.getMockGroups();
-    final people = SkeletonDataService.getMockPeople();
-    final splitQueue = SkeletonDataService.getMockSplitQueue();
+    // TODO: Load real groups, people, and split queue from database
+    final groups = <Map<String, dynamic>>[];
+    final people = <Map<String, dynamic>>[];
+    final splitQueue = <Map<String, dynamic>>[];
     
     return Container(
       color: Colors.white,

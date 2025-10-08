@@ -355,56 +355,31 @@ class OnboardingProvider extends ChangeNotifier {
   }
 
   Future<void> _createDefaultCategories(String userId) async {
-    final categories = <CategoryModel>[];
-
-    // Create parent categories (locked)
-    for (final entry in ParentCategories.categories.entries) {
-      categories.add(CategoryModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString() + entry.key,
-        userId: null, // Global/locked category
-        parentKey: entry.key,
-        name: entry.value['name']!,
-        emoji: entry.value['emoji']!,
-        isLocked: true,
-        createdAt: DateTime.now(),
-      ));
-    }
-
-    // Create default subcategories
-    for (final entry in ParentCategories.subcategories.entries) {
-      for (final sub in entry.value) {
-        categories.add(CategoryModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString() + entry.key + sub['name']!,
-          userId: null, // Global/locked category
-          parentKey: entry.key,
-          name: sub['name']!,
-          emoji: sub['emoji']!,
-          isLocked: true,
-          createdAt: DateTime.now(),
-        ));
-      }
-    }
-
-    // Create custom subcategories
+    // Note: Default categories are now seeded via SQL (setup_categories_database.sql)
+    // This method now only handles user's custom subcategories from onboarding
+    
+    // Create custom subcategories selected during onboarding
+    if (_customSubcategories.isEmpty) return;
+    
     for (final entry in _customSubcategories.entries) {
       for (final subName in entry.value) {
-        categories.add(CategoryModel(
-          id: DateTime.now().millisecondsSinceEpoch.toString() + entry.key + subName,
-          userId: userId,
-          parentKey: entry.key,
-          name: subName,
-          emoji: '📝',
-          isLocked: false,
-          createdAt: DateTime.now(),
-        ));
+        try {
+          await _supabase.from('categories').insert({
+            'user_id': userId,
+            'parent_key': entry.key,
+            'name': subName,
+            'icon': '📝',
+            'is_default': false,
+            'is_active': true,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (e) {
+          print('Error creating custom category: $e');
+          // Continue with other categories even if one fails
+        }
       }
     }
-
-    // Insert categories
-    for (final category in categories) {
-      await _supabase
-          .from('categories')
-          .insert(category.toJson());
-    }
+    
+    print('✅ Created ${_customSubcategories.length} custom category groups');
   }
 }

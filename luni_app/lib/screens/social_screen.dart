@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
-import '../services/skeleton_data_service.dart';
 
 class SocialScreen extends StatelessWidget {
   const SocialScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final conversations = SkeletonDataService.getMockConversations();
+    // TODO: Implement real social/messaging functionality
+    final conversations = <Map<String, dynamic>>[];
     
     return Container(
       color: Colors.white,
@@ -208,7 +208,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final messages = SkeletonDataService.getMockMessages(widget.personId);
+    // TODO: Load real messages from database
+    final messages = <Map<String, dynamic>>[];
     
     return Scaffold(
       backgroundColor: Colors.white,

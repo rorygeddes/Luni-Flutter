@@ -1,59 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../services/skeleton_data_service.dart';
+import '../services/plaid_service.dart';
+import '../services/backend_service.dart';
 import '../models/account_model.dart';
 import '../models/transaction_model.dart';
+import '../models/category_model.dart';
+import 'account_detail_screen.dart';
 
-class TrackScreen extends StatelessWidget {
+class TrackScreen extends StatefulWidget {
   const TrackScreen({super.key});
 
   @override
+  State<TrackScreen> createState() => _TrackScreenState();
+}
+
+class _TrackScreenState extends State<TrackScreen> {
+  List<AccountModel> _accounts = [];
+  List<TransactionModel> _transactions = [];
+  List<CategoryModel> _categories = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await Future.wait([
+        PlaidService.getAccounts(),
+        PlaidService.getTransactions(limit: 50),
+        BackendService.getCategories(),
+      ]);
+      
+      if (mounted) {
+        setState(() {
+          _accounts = results[0] as List<AccountModel>;
+          _transactions = results[1] as List<TransactionModel>;
+          _categories = results[2] as List<CategoryModel>;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _syncTransactions() async {
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔄 Syncing new transactions...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Sync transactions from Plaid
+      await BackendService.syncTransactions();
+
+      // Reload data
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Transactions synced successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Sync failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final accounts = SkeletonDataService.getMockAccounts();
-    final transactions = SkeletonDataService.getMockTransactions();
+    if (_isLoading) {
+      return Container(
+        color: Colors.white,
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_accounts.isEmpty) {
+      return Container(
+        color: Colors.white,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'No accounts connected',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Connect your bank to see your transactions',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     
     return Container(
       color: Colors.white,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Container(
-              padding: EdgeInsets.symmetric(vertical: 16.h),
-              child: Row(
-                children: [
-                  Text(
-                    'Track',
-                    style: TextStyle(
-                      fontSize: 28.sp,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.filter_list,
-                    color: Colors.grey.shade600,
-                    size: 24.w,
-                  ),
-                ],
+      child: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Container(
+                padding: EdgeInsets.symmetric(vertical: 16.h),
+                child: Row(
+                  children: [
+              Text(
+                'Track',
+                style: TextStyle(
+                  fontSize: 28.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            
-            // Accounts Overview
-            _buildAccountsOverview(accounts),
-            SizedBox(height: 24.h),
-            
-            // Recent Transactions
-            _buildRecentTransactions(transactions),
-            SizedBox(height: 24.h),
-            
-            // Categories Overview
-            _buildCategoriesOverview(transactions),
-            SizedBox(height: 24.h),
-          ],
+              const Spacer(),
+              IconButton(
+                icon: Icon(
+                  Icons.sync,
+                  color: Colors.grey.shade600,
+                  size: 24.w,
+                ),
+                onPressed: _syncTransactions,
+              ),
+              Icon(
+                Icons.filter_list,
+                color: Colors.grey.shade600,
+                size: 24.w,
+              ),
+                  ],
+                ),
+              ),
+              
+              // Accounts Overview
+              _buildAccountsOverview(_accounts),
+              SizedBox(height: 24.h),
+              
+              // Recent Transactions
+              _buildRecentTransactions(_transactions),
+              SizedBox(height: 24.h),
+              
+              // Categories Overview
+              _buildCategoriesOverview(_transactions),
+              SizedBox(height: 24.h),
+            ],
+          ),
         ),
       ),
     );
@@ -78,21 +212,29 @@ class TrackScreen extends StatelessWidget {
   }
 
   Widget _buildAccountCard(AccountModel account) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 12.h),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AccountDetailScreen(account: account),
           ),
-        ],
-      ),
-      child: Row(
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade200,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
         children: [
           Container(
             width: 40.w,
@@ -139,6 +281,7 @@ class TrackScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -201,11 +344,43 @@ class TrackScreen extends StatelessWidget {
                   ),
                 ),
                 if (transaction.category != null)
-                  Text(
-                    '${transaction.category} • ${transaction.subcategory}',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey.shade600,
+                  GestureDetector(
+                    onTap: () => _showCategoryEditDialog(transaction),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Text(
+                        '${transaction.category} • ${transaction.subcategory}',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _showCategoryEditDialog(transaction),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Text(
+                        'Tap to categorize',
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -303,6 +478,163 @@ class TrackScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _showCategoryEditDialog(TransactionModel transaction) {
+    String selectedCategory = transaction.category ?? 'other';
+    String selectedSubcategory = transaction.subcategory ?? 'Other';
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Edit Category'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Description (non-editable)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8.r),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      transaction.description,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      '\$${transaction.amount.abs().toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 16.h),
+              
+              // Category Dropdown
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedCategory = value!;
+                    selectedSubcategory = 'Other'; // Reset subcategory
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                ),
+                items: _categories
+                    .where((cat) => cat.parentKey == cat.name.toLowerCase().replaceAll(' ', '_'))
+                    .map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category.parentKey,
+                    child: Text('${category.icon ?? ''} ${category.name}'),
+                  );
+                }).toList(),
+              ),
+              
+              SizedBox(height: 12.h),
+              
+              // Subcategory Dropdown
+              DropdownButtonFormField<String>(
+                value: selectedSubcategory,
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedSubcategory = value!;
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Subcategory',
+                  border: OutlineInputBorder(),
+                ),
+                items: _categories
+                    .where((cat) => cat.parentKey == selectedCategory && cat.name != cat.parentKey)
+                    .map((category) {
+                  return DropdownMenuItem<String>(
+                    value: category.name,
+                    child: Text(category.name),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => _saveCategoryChange(transaction, selectedCategory, selectedSubcategory),
+              child: Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveCategoryChange(TransactionModel transaction, String category, String subcategory) async {
+    try {
+      Navigator.of(context).pop(); // Close dialog
+      
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Updating category...'),
+            ],
+          ),
+        ),
+      );
+
+      // Update the transaction category
+      await BackendService.updateTransactionCategory(
+        transactionId: transaction.id,
+        category: category,
+        subcategory: subcategory,
+        aiDescription: transaction.description,
+      );
+
+      // Reload data to show changes
+      await _loadData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Category updated successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error updating category: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
