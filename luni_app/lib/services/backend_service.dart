@@ -1155,10 +1155,10 @@ class BackendService {
               .limit(remaining)
           : [];
 
-      // Combine transactions
-      final allTransactions = <Map<String, dynamic>>[
-        ...duplicates.cast<Map<String, dynamic>>(),
-        ...regular.cast<Map<String, dynamic>>(),
+      // Combine transactions (explicit typing to ensure correct return type)
+      final List<Map<String, dynamic>> allTransactions = [
+        ...(duplicates as List).cast<Map<String, dynamic>>(),
+        ...(regular as List).cast<Map<String, dynamic>>(),
       ];
 
       // Get user profile for AI context
