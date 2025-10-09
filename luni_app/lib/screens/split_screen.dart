@@ -271,67 +271,64 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     return LuniGestureDetector(
       onTap: () => _showGroupDetails(group['id'] as String),
       child: Container(
-        margin: EdgeInsets.only(bottom: 12.h),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-          color: const Color(0xFFD4AF37), // Gold background
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+        margin: EdgeInsets.only(bottom: 8.h),
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
         child: Row(
           children: [
             // Icon
             Container(
-              padding: EdgeInsets.all(8.w),
+              width: 32.w,
+              height: 32.w,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8.r),
+                color: const Color(0xFFEAB308).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16.r),
               ),
-              child: Text(
-                group['icon'] ?? '👥',
-                style: TextStyle(fontSize: 24.sp),
+              child: Center(
+                child: Text(
+                  group['icon'] ?? '👥',
+                  style: TextStyle(fontSize: 16.sp),
+                ),
               ),
             ),
             SizedBox(width: 12.w),
             
             // Group name and description
             Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
                     group['name'] as String,
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black, // Black text
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
                   if (group['description'] != null && (group['description'] as String).isNotEmpty)
-              Text(
+                    Text(
                       group['description'] as String,
-                style: TextStyle(
-                        fontSize: 12.sp,
-                    color: Colors.black87,
-                  ),
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: Colors.grey.shade600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
-            ],
-          ),
             ),
 
             // Arrow icon
             Icon(
               Icons.chevron_right,
-              color: Colors.black,
-              size: 24.w,
+              color: Colors.grey.shade400,
+              size: 20.w,
             ),
           ],
         ),
@@ -384,32 +381,26 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     return LuniGestureDetector(
       onTap: () => _showPersonDetails(friendId),
       child: Container(
-        margin: EdgeInsets.only(bottom: 12.h),
-        padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-          color: const Color(0xFFD4AF37), // Gold background (same as groups)
-          borderRadius: BorderRadius.circular(12.r),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-            ),
-            child: Row(
-              children: [
+        margin: EdgeInsets.only(bottom: 8.h),
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
             // Avatar
             CircleAvatar(
-              radius: 24.r,
-              backgroundColor: Colors.black.withOpacity(0.1),
+              radius: 16.r,
+              backgroundColor: const Color(0xFFEAB308).withOpacity(0.15),
               backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
               child: avatarUrl == null
                   ? Text(
                       friendName[0].toUpperCase(),
                       style: TextStyle(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
                         color: Colors.black,
                       ),
                     )
@@ -418,22 +409,22 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
             SizedBox(width: 12.w),
             
             // Friend name
-                Expanded(
-                  child: Text(
+            Expanded(
+              child: Text(
                 friendName,
-                    style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black, // Black text
-                    ),
-                  ),
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
+              ),
+            ),
 
             // Arrow icon
             Icon(
               Icons.chevron_right,
-              color: Colors.black,
-              size: 24.w,
+              color: Colors.grey.shade400,
+              size: 20.w,
             ),
           ],
         ),
