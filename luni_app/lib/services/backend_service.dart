@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/category_model.dart';
 import '../models/transaction_model.dart';
+import 'openai_service.dart';
 
 class BackendService {
   // Backend API base URL - you'll need to set up a backend server
@@ -1116,6 +1117,134 @@ class BackendService {
     } catch (e) {
       print('❌ Error getting prioritized transactions: $e');
       throw e;
+    }
+  }
+
+  // Get transaction queue with AI processing (5 at a time)
+  static Future<List<Map<String, dynamic>>> getTransactionQueue() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      print('📋 Loading transaction queue...');
+
+      // Get potential duplicates first (high priority)
+      final duplicates = await supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('is_potential_duplicate', true)
+          .order('duplicate_checked_at', ascending: false)
+          .limit(5);
+
+      // Get regular uncategorized transactions
+      final remaining = 5 - duplicates.length;
+      final regular = remaining > 0
+          ? await supabase
+              .from('transactions')
+              .select()
+              .eq('user_id', user.id)
+              .or('category.is.null,is_categorized.eq.false')
+              .eq('is_potential_duplicate', false)
+              .order('date', ascending: false)
+              .limit(remaining)
+          : [];
+
+      // Combine transactions
+      final allTransactions = [...duplicates, ...regular];
+
+      // Get user profile for AI context
+      final profile = await supabase
+          .from('profiles')
+          .select()
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      // Process each transaction with AI if ai_description doesn't exist
+      for (var transaction in allTransactions) {
+        // Only process if AI description doesn't exist yet
+        if (transaction['ai_description'] == null || transaction['ai_description'].isEmpty) {
+          final aiResult = await OpenAIService.processTransaction(
+            rawDescription: transaction['description'] ?? 'Unknown',
+            amount: (transaction['amount'] ?? 0.0).toDouble(),
+            merchantName: transaction['merchant_name'],
+            userProfile: profile,
+          );
+
+          // Update transaction in database with AI suggestions
+          await supabase
+              .from('transactions')
+              .update({
+                'ai_description': aiResult['ai_description'],
+                'category': aiResult['category'],
+                'subcategory': aiResult['subcategory'],
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', transaction['id']);
+
+          // Update local object
+          transaction['ai_description'] = aiResult['ai_description'];
+          transaction['category'] = aiResult['category'];
+          transaction['subcategory'] = aiResult['subcategory'];
+
+          print('✅ AI processed: ${transaction['description']} → ${aiResult['ai_description']}');
+        }
+      }
+
+      print('📋 Queue loaded: ${allTransactions.length} transactions');
+      return allTransactions;
+    } catch (e) {
+      print('❌ Error getting transaction queue: $e');
+      throw e;
+    }
+  }
+
+  // Submit categorized transactions from queue
+  static Future<bool> submitCategorizedTransactions(List<Map<String, dynamic>> transactions) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      for (var transaction in transactions) {
+        await supabase
+            .from('transactions')
+            .update({
+              'ai_description': transaction['ai_description'],
+              'category': transaction['category'],
+              'subcategory': transaction['subcategory'],
+              'is_categorized': true,
+              'is_split': transaction['is_split'] ?? false,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', transaction['id']);
+
+        print('✅ Submitted: ${transaction['ai_description']}');
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ Error submitting transactions: $e');
+      return false;
+    }
+  }
+
+  // Get count of remaining uncategorized transactions
+  static Future<int> getUncategorizedCount() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return 0;
+
+      final result = await supabase
+          .from('transactions')
+          .select('id', const FetchOptions(count: CountOption.exact))
+          .eq('user_id', user.id)
+          .or('category.is.null,is_categorized.eq.false');
+
+      return result.count ?? 0;
+    } catch (e) {
+      print('❌ Error getting uncategorized count: $e');
+      return 0;
     }
   }
 

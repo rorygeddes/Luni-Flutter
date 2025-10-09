@@ -1,129 +1,76 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/queue_item_model.dart';
-import '../models/transaction_model.dart';
+import '../services/backend_service.dart';
 
 class TransactionQueueScreen extends StatefulWidget {
-  const TransactionQueueScreen({super.key});
+  const TransactionQueueScreen({Key? key}) : super(key: key);
 
   @override
-  State<TransactionQueueScreen> createState() => _TransactionQueueScreenState();
+  _TransactionQueueScreenState createState() => _TransactionQueueScreenState();
 }
 
 class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
-  final SupabaseClient _supabase = Supabase.instance.client;
-  List<QueueItemModel> _queueItems = [];
+  List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
+  int _remainingCount = 0;
+
+  // Category mappings from workflow.md
+  final Map<String, List<String>> _categoryMap = {
+    'LIVING ESSENTIALS': ['Rent', 'Wifi', 'Utilities', 'Phone'],
+    'EDUCATION': ['Tuition', 'Supplies', 'Books'],
+    'FOOD': ['Groceries', 'Coffee & Lunch', 'Restaurants & Dinner'],
+    'TRANSPORTATION': ['Bus Pass', 'Gas', 'Rideshare'],
+    'HEALTHCARE': ['Gym', 'Medication', 'Haircuts', 'Toiletries'],
+    'ENTERTAINMENT': ['Events', 'Night Out', 'Shopping', 'Substances', 'Subscriptions'],
+    'VACATION': ['Travel', 'Accommodation', 'Activities'],
+    'INCOME': ['Job Income', 'Family Support', 'Savings/Investments', 'Bonus', 'E-Transfer In'],
+  };
 
   @override
   void initState() {
     super.initState();
-    _loadQueueItems();
+    _loadQueue();
   }
 
-  Future<void> _loadQueueItems() async {
+  Future<void> _loadQueue() async {
+    setState(() => _isLoading = true);
+    
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-
-      final response = await _supabase
-          .from('transaction_queue')
-          .select('''
-            *,
-            transactions!inner(
-              id,
-              amount,
-              description,
-              merchant_name,
-              date
-            )
-          ''')
-          .eq('user_id', user.id)
-          .eq('status', 'pending')
-          .limit(5);
-
+      final transactions = await BackendService.getTransactionQueue();
+      final count = await BackendService.getUncategorizedCount();
+      
       setState(() {
-        _queueItems = response.map<QueueItemModel>((json) => QueueItemModel.fromJson(json)).toList();
+        _transactions = transactions;
+        _remainingCount = count;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading queue items: $e');
       setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading queue: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _approveTransaction(QueueItemModel queueItem) async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
+  Future<void> _submitTransactions() async {
+    if (_transactions.isEmpty) return;
 
-      // Update transaction with AI categorization
-      await _supabase
-          .from('transactions')
-          .update({
-            'category': queueItem.aiCategory,
-            'subcategory': queueItem.aiSubcategory,
-            'is_categorized': true,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', queueItem.transactionId);
-
-      // Update queue item status
-      await _supabase
-          .from('transaction_queue')
-          .update({'status': 'approved'})
-          .eq('id', queueItem.id);
-
-      // Reload queue
-      await _loadQueueItems();
-
-      if (mounted) {
+    final success = await BackendService.submitCategorizedTransactions(_transactions);
+    
+    if (mounted) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaction approved and categorized!'),
+          SnackBar(
+            content: Text('✅ ${_transactions.length} transactions categorized!'),
             backgroundColor: Colors.green,
           ),
         );
-      }
-    } catch (e) {
-      print('Error approving transaction: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _rejectTransaction(QueueItemModel queueItem) async {
-    try {
-      // Update queue item status
-      await _supabase
-          .from('transaction_queue')
-          .update({'status': 'rejected'})
-          .eq('id', queueItem.id);
-
-      // Reload queue
-      await _loadQueueItems();
-
-      if (mounted) {
+        _loadQueue(); // Load next batch
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Transaction rejected'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Error rejecting transaction: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
+            content: Text('❌ Error submitting transactions'),
             backgroundColor: Colors.red,
           ),
         );
@@ -134,17 +81,60 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Transaction Queue'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+        subtitle: _remainingCount > 0
+            ? Text('$_remainingCount transactions remaining')
+            : null,
+        backgroundColor: const Color(0xFFD4AF37), // Gold
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _queueItems.isEmpty
+          : _transactions.isEmpty
               ? _buildEmptyState()
-              : _buildQueueList(),
+              : Column(
+                  children: [
+                    _buildQueueInfo(),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _transactions.length,
+                        itemBuilder: (context, index) {
+                          return _TransactionQueueCard(
+                            transaction: _transactions[index],
+                            categoryMap: _categoryMap,
+                            onUpdate: (updated) {
+                              setState(() {
+                                _transactions[index] = updated;
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    _buildSubmitButton(),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildQueueInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: Colors.blue[50],
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.blue),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Review ${_transactions.length} transactions. Edit descriptions and categories as needed.',
+              style: const TextStyle(color: Colors.blue),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -153,211 +143,281 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 80.w,
-            color: Colors.green,
-          ),
-          SizedBox(height: 24.h),
-          Text(
+          Icon(Icons.check_circle, size: 64, color: Colors.green[400]),
+          const SizedBox(height: 16),
+          const Text(
             'All caught up!',
-            style: TextStyle(
-              fontSize: 24.sp,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           Text(
-            'No transactions need review at the moment.',
-            style: TextStyle(
-              fontSize: 16.sp,
-              color: Colors.grey.shade600,
-            ),
-            textAlign: TextAlign.center,
+            'No transactions to categorize',
+            style: TextStyle(color: Colors.grey[600]),
           ),
-          SizedBox(height: 32.h),
+          const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEAB308),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 16.h),
-            ),
-            child: Text(
-              'Back to Home',
-              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
-            ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Back to Home'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQueueList() {
-    return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.all(16.w),
-          color: Colors.blue.shade50,
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20.w),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: Text(
-                  'Review and approve AI-categorized transactions (${_queueItems.length}/5)',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+  Widget _buildSubmitButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: ElevatedButton(
+          onPressed: _transactions.isEmpty ? null : _submitTransactions,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFD4AF37), // Gold color
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            'Submit ${_transactions.length} Transaction${_transactions.length != 1 ? 's' : ''}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.all(16.w),
-            itemCount: _queueItems.length,
-            itemBuilder: (context, index) {
-              final queueItem = _queueItems[index];
-              return _buildQueueItem(queueItem);
-            },
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
 
-  Widget _buildQueueItem(QueueItemModel queueItem) {
+class _TransactionQueueCard extends StatefulWidget {
+  final Map<String, dynamic> transaction;
+  final Map<String, List<String>> categoryMap;
+  final Function(Map<String, dynamic>) onUpdate;
+
+  const _TransactionQueueCard({
+    required this.transaction,
+    required this.categoryMap,
+    required this.onUpdate,
+  });
+
+  @override
+  __TransactionQueueCardState createState() => __TransactionQueueCardState();
+}
+
+class __TransactionQueueCardState extends State<_TransactionQueueCard> {
+  late TextEditingController _descriptionController;
+  late String _selectedParent;
+  late String _selectedSub;
+  late bool _isSplit;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController = TextEditingController(
+      text: widget.transaction['ai_description'] ?? widget.transaction['description'],
+    );
+    _selectedParent = widget.transaction['category'] ?? 'ENTERTAINMENT';
+    _selectedSub = widget.transaction['subcategory'] ?? 'Shopping';
+    _isSplit = widget.transaction['is_split'] ?? false;
+
+    // Validate sub-category exists in selected parent
+    if (!widget.categoryMap[_selectedParent]!.contains(_selectedSub)) {
+      _selectedSub = widget.categoryMap[_selectedParent]!.first;
+    }
+
+    _descriptionController.addListener(_updateTransaction);
+  }
+
+  void _updateTransaction() {
+    widget.transaction['ai_description'] = _descriptionController.text;
+    widget.transaction['category'] = _selectedParent;
+    widget.transaction['subcategory'] = _selectedSub;
+    widget.transaction['is_split'] = _isSplit;
+    widget.onUpdate(widget.transaction);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = (widget.transaction['amount'] ?? 0.0).toDouble();
+    final date = widget.transaction['date']?.toString() ?? '';
+    final rawDescription = widget.transaction['description'] ?? 'Unknown';
+    final isPotentialDuplicate = widget.transaction['is_potential_duplicate'] == true;
+
     return Card(
-      margin: EdgeInsets.only(bottom: 16.h),
-      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: isPotentialDuplicate ? 4 : 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isPotentialDuplicate ? Colors.orange : Colors.grey[300]!,
+          width: isPotentialDuplicate ? 2 : 1,
+        ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(16.w),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Transaction info
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        queueItem.aiDescription ?? 'Unknown',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Original: ${queueItem.transactionId}',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
+            // Duplicate warning
+            if (isPotentialDuplicate) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(4),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  child: Text(
-                    '${(queueItem.confidenceScore * 100).toInt()}%',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.green.shade700,
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'POTENTIAL DUPLICATE',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Date and Amount
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  date.split('T')[0],
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+                Text(
+                  '\$${amount.abs().toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: amount < 0 ? Colors.red : Colors.green,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
             
-            SizedBox(height: 16.h),
-            
-            // AI categorization
-            Container(
-              padding: EdgeInsets.all(12.w),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: Colors.blue.shade200),
+            // AI Description (editable)
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Description',
+                border: const OutlineInputBorder(),
+                suffixIcon: const Icon(Icons.edit, size: 20),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AI Suggestion:',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Row(
-                    children: [
-                      _buildCategoryChip(queueItem.aiCategory ?? 'Unknown', Colors.blue),
-                      SizedBox(width: 8.w),
-                      _buildCategoryChip(queueItem.aiSubcategory ?? 'Other', Colors.green),
-                    ],
-                  ),
-                ],
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
+            const SizedBox(height: 4),
             
-            SizedBox(height: 16.h),
+            // Raw description (small grey text)
+            Text(
+              'Raw: $rawDescription',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
             
-            // Action buttons
+            // Category dropdowns
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _rejectTransaction(queueItem),
-                    icon: const Icon(Icons.close, size: 18),
-                    label: const Text('Reject'),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.red.shade300),
-                      foregroundColor: Colors.red.shade600,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedParent,
+                    decoration: const InputDecoration(
+                      labelText: 'Parent Category',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
+                    isExpanded: true,
+                    items: widget.categoryMap.keys.map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: Text(
+                          category,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedParent = value!;
+                        _selectedSub = widget.categoryMap[value]!.first;
+                        _updateTransaction();
+                      });
+                    },
                   ),
                 ),
-                SizedBox(width: 12.w),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _approveTransaction(queueItem),
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Approve'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEAB308),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedSub,
+                    decoration: const InputDecoration(
+                      labelText: 'Sub-Category',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
+                    isExpanded: true,
+                    items: widget.categoryMap[_selectedParent]!.map((sub) {
+                      return DropdownMenuItem(
+                        value: sub,
+                        child: Text(
+                          sub,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSub = value!;
+                        _updateTransaction();
+                      });
+                    },
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Split checkbox
+            CheckboxListTile(
+              title: const Text(
+                'Mark for Split',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: const Text(
+                'Send to split queue after submission',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _isSplit,
+              onChanged: (value) {
+                setState(() {
+                  _isSplit = value ?? false;
+                  _updateTransaction();
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              activeColor: const Color(0xFFD4AF37),
             ),
           ],
         ),
@@ -365,22 +425,9 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
     );
   }
 
-  Widget _buildCategoryChip(String label, Color color) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12.sp,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 }
