@@ -12,6 +12,10 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
   int _remainingCount = 0;
+  
+  // Cache to persist transactions when navigating away
+  static List<Map<String, dynamic>>? _cachedTransactions;
+  static int? _cachedCount;
 
   // Category mappings from workflow.md
   final Map<String, List<String>> _categoryMap = {
@@ -28,7 +32,17 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
   @override
   void initState() {
     super.initState();
-    _loadQueue();
+    // Use cached data if available, otherwise load fresh
+    if (_cachedTransactions != null && _cachedTransactions!.isNotEmpty) {
+      print('📋 Restoring cached queue (${_cachedTransactions!.length} transactions)');
+      setState(() {
+        _transactions = List.from(_cachedTransactions!);
+        _remainingCount = _cachedCount ?? 0;
+        _isLoading = false;
+      });
+    } else {
+      _loadQueue();
+    }
   }
 
   Future<void> _loadQueue() async {
@@ -43,6 +57,12 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
         _remainingCount = count;
         _isLoading = false;
       });
+      
+      // Cache the loaded data
+      _cachedTransactions = List.from(transactions);
+      _cachedCount = count;
+      
+      print('📋 Queue loaded and cached: ${transactions.length} transactions');
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -60,6 +80,10 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
     
     if (mounted) {
       if (success) {
+        // Clear cache so next time we load fresh transactions
+        _cachedTransactions = null;
+        _cachedCount = null;
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ ${_transactions.length} transactions categorized!'),
@@ -81,20 +105,21 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFF2C2416), // Dark gold/bronze background
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Transaction Queue'),
+            const Text('Transaction Queue', style: TextStyle(color: Colors.white)),
             if (_remainingCount > 0)
               Text(
                 '$_remainingCount transactions remaining',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal, color: Colors.white70),
               ),
           ],
         ),
-        backgroundColor: const Color(0xFFD4AF37), // Gold
+        backgroundColor: const Color(0xFF3D2F1F), // Darker gold for AppBar
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -129,15 +154,15 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
   Widget _buildQueueInfo() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.blue[50],
+      color: const Color(0xFF3D2F1F), // Darker gold banner
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Colors.blue),
+          const Icon(Icons.info_outline, color: Color(0xFFD4AF37)),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Review ${_transactions.length} transactions. Edit descriptions and categories as needed.',
-              style: const TextStyle(color: Colors.blue),
+              style: const TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -150,20 +175,24 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle, size: 64, color: Colors.green[400]),
+          const Icon(Icons.check_circle, size: 64, color: Color(0xFFD4AF37)),
           const SizedBox(height: 16),
           const Text(
             'All caught up!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'No transactions to categorize',
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD4AF37),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Back to Home'),
           ),
         ],

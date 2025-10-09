@@ -481,7 +481,8 @@ class BackendService {
           .from('transactions')
           .select()
           .eq('user_id', user.id)
-          .eq('subcategory', subcategoryName);
+          .eq('subcategory', subcategoryName)
+          .eq('is_categorized', true); // Only include categorized transactions
 
       if (startDate != null) {
         query = query.gte('date', startDate.toIso8601String().split('T')[0]);
@@ -493,7 +494,7 @@ class BackendService {
 
       final response = await query.order('date', ascending: false);
 
-      print('📊 Loaded ${response.length} transactions for category $subcategoryName');
+      print('📊 Loaded ${response.length} categorized transactions for $subcategoryName');
       return (response as List)
           .map((json) => TransactionModel.fromJson(json))
           .toList();
@@ -1168,6 +1169,7 @@ class BackendService {
           .maybeSingle();
 
       // Process each transaction with AI if ai_description doesn't exist
+      // BUT DON'T SAVE TO DATABASE - only provide suggestions for user to review
       for (var transaction in allTransactions) {
         // Only process if AI description doesn't exist yet
         if (transaction['ai_description'] == null || transaction['ai_description'].isEmpty) {
@@ -1178,23 +1180,13 @@ class BackendService {
             userProfile: profile,
           );
 
-          // Update transaction in database with AI suggestions
-          await supabase
-              .from('transactions')
-              .update({
-                'ai_description': aiResult['ai_description'],
-                'category': aiResult['category'],
-                'subcategory': aiResult['subcategory'],
-                'updated_at': DateTime.now().toIso8601String(),
-              })
-              .eq('id', transaction['id']);
-
-          // Update local object
+          // Update local object ONLY (don't save to database until user submits)
           transaction['ai_description'] = aiResult['ai_description'];
           transaction['category'] = aiResult['category'];
           transaction['subcategory'] = aiResult['subcategory'];
+          transaction['ai_suggestion_only'] = true; // Flag that this is AI suggestion, not user-confirmed
 
-          print('✅ AI processed: ${transaction['description']} → ${aiResult['ai_description']}');
+          print('💡 AI suggested: ${transaction['description']} → ${aiResult['ai_description']}');
         }
       }
 
