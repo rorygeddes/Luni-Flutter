@@ -1235,19 +1235,21 @@ class BackendService {
 
       print('📋 Loading split queue...');
 
+      // Get only 5 transactions at a time (like transaction queue)
       final response = await supabase
           .from('transactions')
           .select()
           .eq('user_id', user.id)
           .eq('is_split', true)
           .eq('is_categorized', true)
-          .order('date', ascending: false);
+          .order('date', ascending: false)
+          .limit(5);
 
       final transactions = (response as List)
           .map((json) => TransactionModel.fromJson(json))
           .toList();
 
-      print('📋 Split queue loaded: ${transactions.length} transactions');
+      print('📋 Split queue loaded: ${transactions.length} transactions (max 5 at a time)');
       return transactions;
     } catch (e) {
       print('❌ Error getting split queue: $e');
@@ -1648,6 +1650,8 @@ class BackendService {
       final totalAmount = (transaction['amount'] as num).toDouble().abs();
 
       // Create split_transaction record
+      print('📝 Creating split_transaction: groupId=$groupId, payer=${user.id}, amount=$totalAmount');
+      
       final splitTxn = await supabase
           .from('split_transactions')
           .insert({
@@ -1662,17 +1666,20 @@ class BackendService {
           .single();
 
       final splitTxnId = splitTxn['id'] as String;
+      print('✅ Split transaction created with ID: $splitTxnId');
 
       // Calculate equal split amount
       final amountPerPerson = totalAmount / participantUserIds.length;
 
       // Create split_participants for each person
+      print('📝 Adding ${participantUserIds.length} participants...');
       for (final participantId in participantUserIds) {
         await supabase.from('split_participants').insert({
           'split_transaction_id': splitTxnId,
           'user_id': participantId,
           'amount_owed': amountPerPerson,
         });
+        print('   ✅ Added participant: $participantId (\$${amountPerPerson.toStringAsFixed(2)})');
       }
 
       // Update transaction to remove from split queue
@@ -1681,7 +1688,7 @@ class BackendService {
           .update({'is_split': false})
           .eq('id', transactionId);
 
-      print('✅ Split created: \$${totalAmount.toStringAsFixed(2)} among ${participantUserIds.length} people');
+      print('✅ Split created: \$${totalAmount.toStringAsFixed(2)} among ${participantUserIds.length} people${groupId != null ? ' (Group: $groupId)' : ''}');
       return true;
     } catch (e) {
       print('❌ Error submitting split: $e');

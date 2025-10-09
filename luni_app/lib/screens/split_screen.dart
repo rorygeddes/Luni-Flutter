@@ -201,24 +201,25 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
               )
             else
               Expanded(
-                child: Column(
-                  children: [
-                    // PINNED: Groups Section
-                    _buildPinnedGroupsSection(),
-                    
-                    SizedBox(height: 8.h),
-                    
-                    // PINNED: People Section (Friends)
-                    _buildPinnedPeopleSection(),
-                    
-                    SizedBox(height: 16.h),
-                    
-                    // Split Queue Button (Modal Trigger)
-                    _buildSplitQueueButton(),
-                    
-                    // Expandable content area
-                    Expanded(child: Container()),
-                  ],
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Split Queue Button (Modal Trigger) - PINNED AT TOP
+                      _buildSplitQueueButton(),
+                      
+                      SizedBox(height: 16.h),
+                      
+                      // PINNED: Groups Section
+                      _buildPinnedGroupsSection(),
+                      
+                      SizedBox(height: 16.h),
+                      
+                      // PINNED: People Section (Friends)
+                      _buildPinnedPeopleSection(),
+                      
+                      SizedBox(height: 16.h),
+                    ],
+                  ),
                 ),
               ),
           ],
