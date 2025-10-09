@@ -1113,7 +1113,10 @@ class BackendService {
           .limit(5 - duplicates.length);
 
       // Combine with duplicates first
-      return [...duplicates, ...regular];
+      return <Map<String, dynamic>>[
+        ...duplicates.cast<Map<String, dynamic>>(),
+        ...regular.cast<Map<String, dynamic>>(),
+      ];
     } catch (e) {
       print('❌ Error getting prioritized transactions: $e');
       throw e;
@@ -1152,7 +1155,10 @@ class BackendService {
           : [];
 
       // Combine transactions
-      final allTransactions = [...duplicates, ...regular];
+      final allTransactions = <Map<String, dynamic>>[
+        ...duplicates.cast<Map<String, dynamic>>(),
+        ...regular.cast<Map<String, dynamic>>(),
+      ];
 
       // Get user profile for AI context
       final profile = await supabase
@@ -1302,7 +1308,7 @@ class BackendService {
           .eq('can_recover', true)
           .order('deleted_at', ascending: false);
 
-      return result;
+      return result.cast<Map<String, dynamic>>();
     } catch (e) {
       print('❌ Error getting deleted transactions: $e');
       throw e;
