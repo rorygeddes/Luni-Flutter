@@ -25,10 +25,10 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   List<Map<String, dynamic>> _conversations = [];
   bool _showSidebar = false;
   
-  // Agent Mode
-  bool _agentMode = true; // Default to agent mode
+  // Agent Mode (Auto)
   String? _agentThreadId; // OpenAI thread ID for agent conversations
   final List<AgentAction> _agentActions = [];
+  String _currentMode = 'Chat Mode'; // Displays which mode was used: 'Chat Mode' or 'Agent Mode'
 
   @override
   void initState() {
@@ -128,18 +128,15 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         _currentConversationId = conversationId;
         _messages.clear();
         _agentActions.clear();
+        _currentMode = 'Chat Mode'; // Reset to chat mode for new conversation
       });
 
-      // Create OpenAI agent thread if agent mode is enabled
-      if (_agentMode) {
-        _agentThreadId = await AIChatService.createAgentThread();
-        print('🤖 Agent thread created: $_agentThreadId');
-      }
+      // Always create OpenAI agent thread (for auto mode)
+      _agentThreadId = await AIChatService.createAgentThread();
+      print('🤖 Agent thread created: $_agentThreadId');
 
       // Add welcome message and save it
-      final welcomeText = _agentMode
-          ? 'Hey! 👋 I\'m Luni Agent, your AI financial analyst. I can read your transactions, analyze spending patterns, and provide data-driven insights.\n\nAsk me anything about your finances!'
-          : 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?';
+      const welcomeText = 'Hey! 👋 I\'m Luni, your AI financial assistant. I can help with budgeting advice and analyze your spending data when needed.\n\nAsk me anything!';
       
       setState(() {
         _messages.add(ChatMessage(
@@ -229,10 +226,10 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     }
 
     try {
-      if (_agentMode && _agentThreadId != null) {
-        // ======== AGENT MODE ========
-        print('🤖 Using Agent Mode');
-        
+      // ======== AUTO MODE (AI decides whether to use tools) ========
+      bool usedTools = false;
+      
+      if (_agentThreadId != null) {
         await AIChatService.sendMessageWithAgent(
           userMessage: userMessage,
           threadId: _agentThreadId!,
@@ -241,13 +238,15 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             
             setState(() {
               if (status == 'running') {
+                usedTools = true; // Mark that tools are being used
+                _currentMode = 'Agent Mode'; // Switch to Agent Mode display
                 _agentActions.add(AgentAction(
                   name: action,
                   status: 'running',
                   description: _getActionDescription(action),
                   data: data,
                 ));
-                print('🔄 Agent action: $action (running)');
+                print('🔄 Agent action: $action (running) - Auto mode activated');
               } else if (status == 'complete') {
                 final index = _agentActions.indexWhere(
                   (a) => a.name == action && a.status == 'running'
@@ -265,6 +264,14 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           },
           onResponse: (aiResponse) async {
             if (!mounted) return;
+            
+            // If no tools were used, this was just a chat response
+            if (!usedTools) {
+              setState(() {
+                _currentMode = 'Chat Mode';
+              });
+              print('💬 No tools used - stayed in Chat Mode');
+            }
             
             setState(() {
               _messages.add(ChatMessage(
@@ -298,45 +305,16 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           },
         );
       } else {
-        // ======== REGULAR MODE ========
-        print('💬 Using Regular Mode');
-        
-        // Build conversation history (last 10 messages for context)
-        final history = _messages
-            .where((m) => !m.text.startsWith('Hey! 👋')) // Exclude welcome
-            .skip(_messages.length > 11 ? _messages.length - 11 : 0)
-            .take(10)
-            .map((m) => {
-                  'role': m.isUser ? 'user' : 'assistant',
-                  'content': m.text,
-                })
-            .toList();
-
-        // Get AI response
-        final aiResponse = await AIChatService.sendMessage(
-          userMessage: userMessage,
-          conversationHistory: history,
-          financialContext: _financialContext,
-        );
-
-        // Add AI response
+        // Fallback if no agent thread (shouldn't happen)
+        print('⚠️ No agent thread available');
         setState(() {
           _messages.add(ChatMessage(
-            text: aiResponse,
+            text: 'Sorry, I\'m having trouble connecting. Please try creating a new chat.',
             isUser: false,
             timestamp: DateTime.now(),
           ));
           _isLoading = false;
         });
-
-        // Save AI response to database
-        await BackendService.saveAIMessage(
-          conversationId: _currentConversationId!,
-          role: 'assistant',
-          content: aiResponse,
-        );
-
-        _scrollToBottom();
       }
     } catch (e) {
       print('❌ Error in _sendMessage: $e');
@@ -417,14 +395,20 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   }
 
   Widget _buildHeader() {
+    final isAgentMode = _currentMode == 'Agent Mode';
+    
     return Container(
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          colors: [const Color(0xFFEAB308), const Color(0xFFD4AF37)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
+            color: const Color(0xFFEAB308).withOpacity(0.3),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
@@ -434,7 +418,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           LuniIconButton(
             icon: Icons.menu,
             onPressed: () => setState(() => _showSidebar = !_showSidebar),
-            color: Colors.black87,
+            color: Colors.white,
             size: 24.w,
           ),
           SizedBox(width: 12.w),
@@ -442,17 +426,12 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: _agentMode 
-                    ? [const Color(0xFFEAB308), const Color(0xFFD4AF37)]
-                    : [Colors.blue.shade400, Colors.blue.shade600],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
             ),
             child: Icon(
-              _agentMode ? Icons.psychology_rounded : Icons.chat_bubble_outline,
+              isAgentMode ? Icons.psychology_rounded : Icons.chat_bubble_outline,
               color: Colors.white,
               size: 24.w,
             ),
@@ -463,11 +442,11 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _agentMode ? 'Luni Agent' : 'Luni AI',
+                  'Luni AI',
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Colors.white,
                   ),
                 ),
                 Row(
@@ -476,16 +455,17 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                       width: 8.w,
                       height: 8.w,
                       decoration: BoxDecoration(
-                        color: _agentMode ? const Color(0xFFEAB308) : Colors.green,
+                        color: Colors.white,
                         shape: BoxShape.circle,
                       ),
                     ),
                     SizedBox(width: 6.w),
                     Text(
-                      _agentMode ? 'Agent Mode' : 'Chat Mode',
+                      _currentMode, // Shows 'Chat Mode' or 'Agent Mode'
                       style: TextStyle(
                         fontSize: 12.sp,
-                        color: Colors.grey.shade600,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -493,41 +473,10 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
               ],
             ),
           ),
-          // Agent mode toggle
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-            decoration: BoxDecoration(
-              color: _agentMode ? const Color(0xFFEAB308).withOpacity(0.1) : Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(20.r),
-              border: Border.all(
-                color: _agentMode ? const Color(0xFFEAB308) : Colors.blue.shade400,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _agentMode ? Icons.psychology : Icons.chat,
-                  size: 16.w,
-                  color: _agentMode ? const Color(0xFFEAB308) : Colors.blue.shade600,
-                ),
-                SizedBox(width: 6.w),
-                LuniSwitch(
-                  value: _agentMode,
-                  onChanged: (value) {
-                    setState(() => _agentMode = value);
-                    _createNewChat(); // Recreate chat with new mode
-                  },
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 12.w),
           LuniIconButton(
             icon: Icons.close,
             onPressed: () => Navigator.pop(context),
-            color: Colors.black87,
+            color: Colors.white,
             size: 24.w,
           ),
         ],
