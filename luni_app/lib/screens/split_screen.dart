@@ -12,10 +12,10 @@ class SplitScreen extends StatefulWidget {
 
 class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClientMixin {
   List<TransactionModel> _splitQueue = [];
+  List<Map<String, dynamic>> _groups = [];
   bool _isLoading = true;
   
-  // TODO: Load real groups and people from database
-  final groups = <Map<String, dynamic>>[];
+  // Temporarily keep these for display
   final people = <Map<String, dynamic>>[];
 
   @override
@@ -31,14 +31,18 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     setState(() => _isLoading = true);
     
     try {
-      final splitTransactions = await BackendService.getSplitQueue();
+      final results = await Future.wait([
+        BackendService.getSplitQueue(),
+        BackendService.getUserGroups(),
+      ]);
       
       if (mounted) {
         setState(() {
-          _splitQueue = splitTransactions;
+          _splitQueue = results[0] as List<TransactionModel>;
+          _groups = results[1] as List<Map<String, dynamic>>;
           _isLoading = false;
         });
-        print('📋 Split queue loaded: ${splitTransactions.length} transactions');
+        print('📋 Split queue loaded: ${_splitQueue.length} transactions, ${_groups.length} groups');
       }
     } catch (e) {
       print('❌ Error loading split queue: $e');
@@ -48,19 +52,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     }
   }
 
-  Future<void> _confirmSplit(TransactionModel transaction) async {
-    // TODO: Implement split confirmation logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Split feature coming soon!')),
-    );
-  }
-
-  Future<void> _modifySplit(TransactionModel transaction) async {
-    // TODO: Implement split modification dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Modify split feature coming soon!')),
-    );
-  }
+  // Removed old _confirmSplit and _modifySplit - functionality now in _SplitQueueCard widget
 
   @override
   Widget build(BuildContext context) {
@@ -139,8 +131,10 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                 ),
 
               // Groups Section
-              _buildSectionHeader('Groups', groups.length),
-              _buildGroupsList(groups),
+              if (!_isLoading) ...[
+                _buildSectionHeader('Groups', _groups.length),
+                _buildGroupsList(_groups),
+              ],
               
               SizedBox(height: 24.h),
               
@@ -192,135 +186,18 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
 
   Widget _buildSplitQueue(List<TransactionModel> queue) {
     return Column(
-      children: queue.map((transaction) => _buildSplitQueueItem(transaction)).toList(),
+      children: queue.map((transaction) => _SplitQueueCard(
+        transaction: transaction,
+        groups: _groups,
+        onSplitSubmitted: () {
+          // Reload queue after split is submitted
+          _loadSplitQueue();
+        },
+      )).toList(),
     );
   }
 
-  Widget _buildSplitQueueItem(TransactionModel transaction) {
-    final description = transaction.aiDescription ?? transaction.description ?? 'Unknown';
-    final amount = transaction.amount.abs();
-    final date = transaction.date;
-    final category = transaction.category ?? 'Uncategorized';
-    
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: const Color(0xFFD4AF37), width: 2), // Gold border
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header: Description and Amount
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      '${date.month}/${date.day}/${date.year} • $category',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Text(
-                '\$${amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFD4AF37),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          
-          // AI Suggestion Banner
-          Container(
-            padding: EdgeInsets.all(12.w),
-            decoration: BoxDecoration(
-              color: const Color(0xFFD4AF37).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome, color: const Color(0xFFD4AF37), size: 18.w),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Text(
-                    'Ready to split among group or individuals',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12.h),
-          
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _modifySplit(transaction),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFD4AF37)),
-                    foregroundColor: const Color(0xFFD4AF37),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  child: const Text('Modify'),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _confirmSplit(transaction),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  child: const Text('Split Now'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed old _buildSplitQueueItem - now using _SplitQueueCard widget below
 
   Widget _buildGroupsList(List<Map<String, dynamic>> groups) {
     return Column(
@@ -493,6 +370,324 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Split Queue Card Widget with Group/Person Selection
+class _SplitQueueCard extends StatefulWidget {
+  final TransactionModel transaction;
+  final List<Map<String, dynamic>> groups;
+  final VoidCallback onSplitSubmitted;
+
+  const _SplitQueueCard({
+    required this.transaction,
+    required this.groups,
+    required this.onSplitSubmitted,
+  });
+
+  @override
+  State<_SplitQueueCard> createState() => __SplitQueueCardState();
+}
+
+class __SplitQueueCardState extends State<_SplitQueueCard> {
+  String? _selectedGroupId;
+  List<Map<String, dynamic>> _groupMembers = [];
+  List<String> _selectedPeopleIds = [];
+  bool _isGroupVisible = false;
+  bool _isLoadingMembers = false;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // If only one group exists, auto-select it
+    if (widget.groups.length == 1) {
+      _selectedGroupId = widget.groups.first['id'];
+      _loadGroupMembers(_selectedGroupId!);
+    }
+  }
+
+  Future<void> _loadGroupMembers(String groupId) async {
+    setState(() => _isLoadingMembers = true);
+    
+    try {
+      final members = await BackendService.getGroupMembers(groupId);
+      if (mounted) {
+        setState(() {
+          _groupMembers = members;
+          _isLoadingMembers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMembers = false);
+      }
+    }
+  }
+
+  Future<void> _submitSplit() async {
+    if (_selectedPeopleIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one person to split with')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final success = await BackendService.submitSplitTransaction(
+      transactionId: widget.transaction.id,
+      participantUserIds: _selectedPeopleIds,
+      groupId: _selectedGroupId,
+      isGroupVisible: _isGroupVisible,
+    );
+
+    if (mounted) {
+      setState(() => _isSubmitting = false);
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ Split \$${widget.transaction.amount.abs().toStringAsFixed(2)} among ${_selectedPeopleIds.length} people',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onSplitSubmitted();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Error creating split'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final description = widget.transaction.aiDescription ?? widget.transaction.description ?? 'Unknown';
+    final amount = widget.transaction.amount.abs();
+    final date = widget.transaction.date;
+    final amountPerPerson = _selectedPeopleIds.isNotEmpty 
+        ? amount / _selectedPeopleIds.length 
+        : amount;
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: const Color(0xFFD4AF37), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      '${date.month}/${date.day}/${date.year}',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '\$${amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFD4AF37),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16.h),
+
+          // Group Selection
+          DropdownButtonFormField<String>(
+            value: _selectedGroupId,
+            decoration: InputDecoration(
+              labelText: 'Select Group',
+              border: const OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            ),
+            items: widget.groups.map((group) {
+              return DropdownMenuItem<String>(
+                value: group['id'],
+                child: Row(
+                  children: [
+                    Text(group['icon'] ?? '👥'),
+                    SizedBox(width: 8.w),
+                    Text(group['name']),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _selectedGroupId = value;
+                  _selectedPeopleIds.clear();
+                });
+                _loadGroupMembers(value);
+              }
+            },
+          ),
+          SizedBox(height: 12.h),
+
+          // Members Selection
+          if (_selectedGroupId != null) ...[
+            Text(
+              'Select People to Split With:',
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            
+            if (_isLoadingMembers)
+              const Center(child: CircularProgressIndicator())
+            else if (_groupMembers.isEmpty)
+              Text(
+                'No members in this group',
+                style: TextStyle(fontSize: 12.sp, color: Colors.grey),
+              )
+            else
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 8.h,
+                children: _groupMembers.map((member) {
+                  final userId = member['user_id'];
+                  final isSelected = _selectedPeopleIds.contains(userId);
+                  final displayName = member['nickname'] ?? 
+                                     member['profiles']?['username'] ?? 
+                                     member['profiles']?['email'] ?? 
+                                     'Unknown';
+
+                  return FilterChip(
+                    label: Text(displayName),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFFD4AF37).withOpacity(0.3),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedPeopleIds.add(userId);
+                        } else {
+                          _selectedPeopleIds.remove(userId);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            SizedBox(height: 12.h),
+
+            // Group Visibility Toggle
+            CheckboxListTile(
+              title: Text(
+                'Make visible to group chat',
+                style: TextStyle(fontSize: 13.sp),
+              ),
+              value: _isGroupVisible,
+              onChanged: (value) {
+                setState(() => _isGroupVisible = value ?? false);
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              activeColor: const Color(0xFFD4AF37),
+            ),
+          ],
+
+          // Split Preview
+          if (_selectedPeopleIds.isNotEmpty) ...[
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4AF37).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Amount per person:',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '\$${amountPerPerson.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFFD4AF37),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12.h),
+          ],
+
+          // Submit Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitSplit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Confirm Split'),
+            ),
           ),
         ],
       ),

@@ -1370,4 +1370,174 @@ class BackendService {
       return false;
     }
   }
+
+  // ============== SPLIT & GROUP MANAGEMENT ==============
+
+  // Get all groups the user is a member of
+  static Future<List<Map<String, dynamic>>> getUserGroups() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('groups')
+          .select('*')
+          .order('name');
+
+      print('📋 Loaded ${(response as List).length} groups');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting groups: $e');
+      return [];
+    }
+  }
+
+  // Get members of a specific group
+  static Future<List<Map<String, dynamic>>> getGroupMembers(String groupId) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Join with profiles to get user info
+      final response = await supabase
+          .from('group_members')
+          .select('*, profiles!inner(id, username, email)')
+          .eq('group_id', groupId);
+
+      print('📋 Loaded ${(response as List).length} members for group $groupId');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting group members: $e');
+      return [];
+    }
+  }
+
+  // Create a new group
+  static Future<String?> createGroup({
+    required String name,
+    String? icon,
+    String? description,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('groups')
+          .insert({
+            'name': name,
+            'icon': icon ?? '👥',
+            'description': description,
+            'created_by': user.id,
+          })
+          .select()
+          .single();
+
+      final groupId = response['id'] as String;
+
+      // Add creator as first member
+      await supabase.from('group_members').insert({
+        'group_id': groupId,
+        'user_id': user.id,
+        'added_by': user.id,
+      });
+
+      print('✅ Group created: $name');
+      return groupId;
+    } catch (e) {
+      print('❌ Error creating group: $e');
+      return null;
+    }
+  }
+
+  // Add member to group
+  static Future<bool> addGroupMember({
+    required String groupId,
+    required String userId,
+    String? nickname,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      await supabase.from('group_members').insert({
+        'group_id': groupId,
+        'user_id': userId,
+        'nickname': nickname,
+        'added_by': user.id,
+      });
+
+      print('✅ Member added to group');
+      return true;
+    } catch (e) {
+      print('❌ Error adding group member: $e');
+      return false;
+    }
+  }
+
+  // Submit split transaction
+  static Future<bool> submitSplitTransaction({
+    required String transactionId,
+    required List<String> participantUserIds,
+    String? groupId,
+    bool isGroupVisible = false,
+    String splitMethod = 'equal',
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get transaction amount
+      final transaction = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('id', transactionId)
+          .single();
+
+      final totalAmount = (transaction['amount'] as num).toDouble().abs();
+
+      // Create split_transaction record
+      final splitTxn = await supabase
+          .from('split_transactions')
+          .insert({
+            'transaction_id': transactionId,
+            'payer_id': user.id,
+            'total_amount': totalAmount,
+            'split_method': splitMethod,
+            'is_group_visible': isGroupVisible,
+            'group_id': groupId,
+          })
+          .select()
+          .single();
+
+      final splitTxnId = splitTxn['id'] as String;
+
+      // Calculate equal split amount
+      final amountPerPerson = totalAmount / participantUserIds.length;
+
+      // Create split_participants for each person
+      for (final participantId in participantUserIds) {
+        await supabase.from('split_participants').insert({
+          'split_transaction_id': splitTxnId,
+          'user_id': participantId,
+          'amount_owed': amountPerPerson,
+        });
+      }
+
+      // Update transaction to remove from split queue
+      await supabase
+          .from('transactions')
+          .update({'is_split': false})
+          .eq('id', transactionId);
+
+      print('✅ Split created: \$${totalAmount.toStringAsFixed(2)} among ${participantUserIds.length} people');
+      return true;
+    } catch (e) {
+      print('❌ Error submitting split: $e');
+      return false;
+    }
+  }
 }
