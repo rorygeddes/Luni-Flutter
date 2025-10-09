@@ -13,10 +13,9 @@ class SplitScreen extends StatefulWidget {
 class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClientMixin {
   List<TransactionModel> _splitQueue = [];
   List<Map<String, dynamic>> _groups = [];
+  List<Map<String, dynamic>> _friends = [];
   bool _isLoading = true;
-  
-  // Temporarily keep these for display
-  final people = <Map<String, dynamic>>[];
+  bool _showSplitQueue = false; // Controls split queue modal visibility
 
   @override
   bool get wantKeepAlive => true;
@@ -34,18 +33,20 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
       final results = await Future.wait([
         BackendService.getSplitQueue(),
         BackendService.getUserGroups(),
+        BackendService.getFriends(),
       ]);
       
       if (mounted) {
         setState(() {
           _splitQueue = results[0] as List<TransactionModel>;
           _groups = results[1] as List<Map<String, dynamic>>;
+          _friends = results[2] as List<Map<String, dynamic>>;
           _isLoading = false;
         });
-        print('📋 Split queue loaded: ${_splitQueue.length} transactions, ${_groups.length} groups');
+        print('📋 Loaded: ${_splitQueue.length} transactions, ${_groups.length} groups, ${_friends.length} friends');
       }
     } catch (e) {
-      print('❌ Error loading split queue: $e');
+      print('❌ Error loading split data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -54,6 +55,100 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
 
   // Removed old _confirmSplit and _modifySplit - functionality now in _SplitQueueCard widget
 
+  void _showSplitQueueModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20.r),
+                topRight: Radius.circular(20.r),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: EdgeInsets.symmetric(vertical: 8.h),
+                  width: 40.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Split Queue',
+                        style: TextStyle(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_splitQueue.length} transaction${_splitQueue.length != 1 ? 's' : ''}',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: Colors.grey.shade200),
+                // Split Queue List
+                Expanded(
+                  child: _splitQueue.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle, size: 48.sp, color: Colors.grey.shade400),
+                              SizedBox(height: 12.h),
+                              Text(
+                                'No transactions to split',
+                                style: TextStyle(fontSize: 16.sp, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: scrollController,
+                          padding: EdgeInsets.all(16.w),
+                          itemCount: _splitQueue.length,
+                          itemBuilder: (context, index) {
+                            return _SplitQueueCard(
+                              transaction: _splitQueue[index],
+                              groups: _groups,
+                              onSplitSubmitted: () {
+                                _loadSplitQueue();
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -61,90 +156,181 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     return Container(
       color: Colors.white,
       child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Padding(
-                padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 16.h),
-                child: Row(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 8.h),
+              child: Row(
+                children: [
+                  Text(
+                    'Split',
+                    style: TextStyle(
+                      fontSize: 28.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            if (_isLoading)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              Expanded(
+                child: Column(
                   children: [
-                    Text(
-                      'Split',
-                      style: TextStyle(
-                        fontSize: 28.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: Icon(Icons.add_circle_outline, color: const Color(0xFFEAB308)),
-                      onPressed: () {
-                        // Add new split
-                      },
-                    ),
+                    // PINNED: Groups Section
+                    _buildPinnedGroupsSection(),
+                    
+                    SizedBox(height: 8.h),
+                    
+                    // PINNED: People Section (Friends)
+                    _buildPinnedPeopleSection(),
+                    
+                    SizedBox(height: 16.h),
+                    
+                    // Split Queue Button (Modal Trigger)
+                    _buildSplitQueueButton(),
+                    
+                    // Expandable content area
+                    Expanded(child: Container()),
                   ],
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // Loading state
-              if (_isLoading)
-                Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32.h),
-                    child: const CircularProgressIndicator(),
-                  ),
+  Widget _buildPinnedGroupsSection() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Groups',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
                 ),
-              
-              // Split Queue Section
-              if (!_isLoading && _splitQueue.isNotEmpty) ...[
-                _buildSectionHeader('Split Queue', _splitQueue.length),
-                _buildSplitQueue(_splitQueue),
-                SizedBox(height: 24.h),
-              ],
-              
-              // Empty state for split queue
-              if (!_isLoading && _splitQueue.isEmpty)
-                Padding(
-                  padding: EdgeInsets.all(32.h),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.check_circle_outline,
-                          size: 48.sp,
-                          color: Colors.grey.shade400,
-                        ),
-                        SizedBox(height: 16.h),
-                        Text(
-                          'No transactions to split',
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  // TODO: Show create group dialog
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Create'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFD4AF37),
                 ),
-
-              // Groups Section
-              if (!_isLoading) ...[
-                _buildSectionHeader('Groups', _groups.length),
-                _buildGroupsList(_groups),
-              ],
-              
-              SizedBox(height: 24.h),
-              
-              // People Section
-              _buildSectionHeader('People', people.length),
-              _buildPeopleList(people),
-              
-              SizedBox(height: 24.h),
+              ),
             ],
           ),
+          SizedBox(height: 8.h),
+          _groups.isEmpty
+              ? Text('No groups yet', style: TextStyle(color: Colors.grey.shade600))
+              : Wrap(
+                  spacing: 8.w,
+                  runSpacing: 8.h,
+                  children: _groups.map((group) {
+                    return Chip(
+                      avatar: Text(group['icon'] ?? '👥'),
+                      label: Text(group['name']),
+                      backgroundColor: const Color(0xFFD4AF37).withOpacity(0.1),
+                    );
+                  }).toList(),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPinnedPeopleSection() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Friends',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          _friends.isEmpty
+              ? Text('No friends yet - add friends in Social tab', style: TextStyle(color: Colors.grey.shade600, fontSize: 13.sp))
+              : Wrap(
+                  spacing: 8.w,
+                  runSpacing: 8.h,
+                  children: _friends.map((friend) {
+                    return Chip(
+                      avatar: CircleAvatar(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        child: Text(
+                          (friend['username'] as String?)?.substring(0, 1).toUpperCase() ?? '?',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      label: Text(friend['username'] as String? ?? 'Unknown'),
+                      backgroundColor: Colors.white,
+                    );
+                  }).toList(),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSplitQueueButton() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      child: ElevatedButton(
+        onPressed: _showSplitQueueModal,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFD4AF37),
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 16.h),
+          minimumSize: Size(double.infinity, 50.h),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.receipt_long),
+            SizedBox(width: 8.w),
+            Text(
+              'Split Queue (${_splitQueue.length})',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );
