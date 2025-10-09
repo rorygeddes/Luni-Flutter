@@ -1226,6 +1226,35 @@ class BackendService {
     }
   }
 
+  // Get split queue (transactions marked for splitting)
+  static Future<List<TransactionModel>> getSplitQueue() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      print('📋 Loading split queue...');
+
+      final response = await supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('is_split', true)
+          .eq('is_categorized', true)
+          .order('date', ascending: false);
+
+      final transactions = (response as List)
+          .map((json) => TransactionModel.fromJson(json))
+          .toList();
+
+      print('📋 Split queue loaded: ${transactions.length} transactions');
+      return transactions;
+    } catch (e) {
+      print('❌ Error getting split queue: $e');
+      return [];
+    }
+  }
+
   // Get count of remaining uncategorized transactions
   static Future<int> getUncategorizedCount() async {
     try {
