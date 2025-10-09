@@ -422,7 +422,7 @@ Communication style:
         'type': 'function',
         'function': {
           'name': 'get_spending_by_category',
-          'description': 'Calculate total spending for each category. Use when user asks about category breakdowns or which category they spend most on.',
+          'description': 'Calculate total spending for each category with detailed breakdown. Returns categories with totals, transaction counts, and subcategories. Use when user asks about category breakdowns, spending patterns, where they spend most, or which category has the most transactions. Categories include: Food, Entertainment, Transportation, Living Essentials, Education, Healthcare, Vacation.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -524,6 +524,8 @@ Communication style:
           final endDate = DateTime.parse(arguments['end_date']);
 
           final categoryTotals = <String, double>{};
+          final categoryDetails = <String, Map<String, dynamic>>{};
+          int processedCount = 0;
 
           for (var t in transactions) {
             try {
@@ -531,10 +533,28 @@ Communication style:
               if (date.isAfter(startDate.subtract(const Duration(days: 1))) &&
                   date.isBefore(endDate.add(const Duration(days: 1)))) {
                 final category = t['category'] as String? ?? 'Uncategorized';
+                final subcategory = t['subcategory'] as String?;
                 final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
-                if (amount < 0) {
+                
+                if (amount < 0) { // Only count expenses
                   categoryTotals[category] =
                       (categoryTotals[category] ?? 0) + amount.abs();
+                  
+                  // Track subcategories and transaction count
+                  if (!categoryDetails.containsKey(category)) {
+                    categoryDetails[category] = {
+                      'transaction_count': 0,
+                      'subcategories': <String>{},
+                    };
+                  }
+                  categoryDetails[category]!['transaction_count'] = 
+                      (categoryDetails[category]!['transaction_count'] as int) + 1;
+                  
+                  if (subcategory != null) {
+                    (categoryDetails[category]!['subcategories'] as Set<String>).add(subcategory);
+                  }
+                  
+                  processedCount++;
                 }
               }
             } catch (e) {
@@ -546,14 +566,22 @@ Communication style:
           final sorted = categoryTotals.entries.toList()
             ..sort((a, b) => b.value.compareTo(a.value));
 
+          final totalSpending = sorted.fold(0.0, (sum, e) => sum + e.value);
+
+          print('✅ Agent tool: Found ${sorted.length} categories from $processedCount transactions');
+          print('   Top 3: ${sorted.take(3).map((e) => '${e.key}: \$${e.value.toStringAsFixed(2)}').join(', ')}');
+
           return {
             'categories': sorted
                 .map((e) => {
                       'category': e.key,
                       'total': e.value,
+                      'transaction_count': categoryDetails[e.key]!['transaction_count'],
+                      'subcategories': (categoryDetails[e.key]!['subcategories'] as Set<String>).toList(),
                     })
                 .toList(),
-            'total_spending': sorted.fold(0.0, (sum, e) => sum + e.value),
+            'total_spending': totalSpending,
+            'transaction_count': processedCount,
           };
 
         case 'get_account_balances':

@@ -687,6 +687,14 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         case 'get_spending_by_category':
           final total = action.data!['total_spending'] ?? 0.0;
           final categories = action.data!['categories'] as List? ?? [];
+          final transactionCount = action.data!['transaction_count'] ?? 0;
+          
+          if (categories.isNotEmpty) {
+            final topCategory = categories.first as Map<String, dynamic>;
+            final topName = topCategory['category'] as String;
+            final topAmount = topCategory['total'] as double;
+            return 'Found ${categories.length} categories ($transactionCount transactions). Top: $topName (\$${topAmount.toStringAsFixed(2)})';
+          }
           return 'Analyzed ${categories.length} categories, \$${total.toStringAsFixed(2)} total';
           
         case 'get_account_balances':
