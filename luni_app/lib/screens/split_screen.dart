@@ -1045,7 +1045,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                     fontSize: 12.sp,
                                     color: Colors.grey.shade600,
                                   ),
-                                ),
+          ),
         ],
       ),
     );
@@ -1280,7 +1280,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
   List<Map<String, dynamic>> _groupMembers = [];
   List<Map<String, dynamic>> _allFriends = [];
   List<String> _selectedPeopleIds = [];
-  bool _isGroupVisible = false;
+  bool _isGroupVisible = true; // Always visible to group - user requested
   bool _isLoadingMembers = false;
   bool _isLoadingFriends = false;
   bool _isSubmitting = false;
@@ -1623,20 +1623,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
               ),
             SizedBox(height: 12.h),
 
-            // Group Visibility Toggle
-            CheckboxListTile(
-              title: Text(
-                'Make visible to group chat',
-                style: TextStyle(fontSize: 13.sp),
-              ),
-              value: _isGroupVisible,
-              onChanged: (value) {
-                setState(() => _isGroupVisible = value ?? false);
-              },
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-              activeColor: const Color(0xFFD4AF37),
-            ),
+            // Removed "Make visible to group chat" toggle - always visible now
           ],
 
           // Split Preview
@@ -1652,15 +1639,18 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        _selectedPersonId != null 
-                            ? 'Splitting with 1 person:' 
-                            : 'Amount per person (${_selectedPeopleIds.length}):',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          _selectedPersonId != null 
+                              ? 'Splitting with 1 person:' 
+                              : 'Amount per person (${_selectedPeopleIds.length}):',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
+                      SizedBox(width: 8.w),
                       Text(
                         '\$${amountPerPerson.toStringAsFixed(2)}',
                         style: TextStyle(
