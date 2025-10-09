@@ -1787,7 +1787,8 @@ class BackendService {
           .eq('id', otherUserId)
           .single();
 
-      // Get all split transactions where both users are participants
+      // Get all split transactions involving these two users
+      // Either: current user paid & other user is participant, OR other user paid & current user is participant
       final splits = await supabase
           .from('split_transactions')
           .select('''
@@ -1798,12 +1799,22 @@ class BackendService {
           .or('payer_id.eq.${user.id},payer_id.eq.$otherUserId')
           .order('created_at', ascending: false) as List<dynamic>;
 
-      // Filter to only splits involving both users
+      // Filter to only splits involving EXACTLY these two users
+      // Case 1: Current user paid, other user is participant
+      // Case 2: Other user paid, current user is participant
       final relevantSplits = splits.where((split) {
+        final payerId = split['payer_id'] as String;
         final participants = (split['split_participants'] as List<dynamic>?) ?? [];
-        final userIds = participants.map((p) => p['user_id'] as String).toSet();
-        return userIds.contains(user.id) && userIds.contains(otherUserId);
+        final participantIds = participants.map((p) => p['user_id'] as String).toSet();
+        
+        // Check if this split involves exactly these two users
+        final case1 = payerId == user.id && participantIds.contains(otherUserId);
+        final case2 = payerId == otherUserId && participantIds.contains(user.id);
+        
+        return case1 || case2;
       }).toList();
+      
+      print('📊 Found ${relevantSplits.length} splits between you and $otherUserId');
 
       // Calculate total balance
       double totalBalance = 0.0;

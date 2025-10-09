@@ -1333,15 +1333,16 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
       if (mounted) {
         setState(() {
           _groupMembers = members;
-          // Auto-select all group members (excluding current user who is the payer)
+          // Auto-select all group members EXCEPT current user (payer doesn't owe themselves)
           final currentUserId = Supabase.instance.client.auth.currentUser?.id;
           _selectedPeopleIds = members
-              .where((m) => m['id'] != currentUserId) // Exclude payer
+              .where((m) => m['id'] != currentUserId)
               .map((m) => m['id'] as String)
               .toList();
           _isLoadingMembers = false;
           
-          print('✅ Auto-selected ${_selectedPeopleIds.length} group members for split');
+          print('📋 Group has ${members.length} total members');
+          print('✅ Auto-selected ${_selectedPeopleIds.length} group members for split (excluding payer)');
         });
       }
     } catch (e) {
@@ -1628,22 +1629,33 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
                     return friendId != null && !_quickGroupPeople.contains(friendId);
                   }).map((friend) {
                     final friendId = friend['friend_user_id'] as String;
-                    final username = friend['username'] as String? ?? 'Unknown';
+                    final username = friend['username'] as String? ?? friend['full_name'] as String? ?? 'Unknown';
+                    final avatarUrl = friend['avatar_url'] as String?;
                     
                     return DropdownMenuItem<String>(
                       value: friendId,
                       child: Row(
                         children: [
                           CircleAvatar(
-                            radius: 12.r,
-                            backgroundColor: const Color(0xFFD4AF37),
-                            child: Text(
-                              username.isNotEmpty ? username.substring(0, 1).toUpperCase() : '?',
-                              style: TextStyle(fontSize: 10.sp, color: Colors.white),
-                            ),
+                            radius: 14.r,
+                            backgroundColor: const Color(0xFFD4AF37).withOpacity(0.2),
+                            backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl == null || avatarUrl.isEmpty
+                                ? Text(
+                                    username.isNotEmpty ? username.substring(0, 1).toUpperCase() : '?',
+                                    style: TextStyle(fontSize: 10.sp, color: const Color(0xFFD4AF37), fontWeight: FontWeight.bold),
+                                  )
+                                : null,
                           ),
-                          SizedBox(width: 8.w),
-                          Text(username),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Text(
+                              username,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+          ),
         ],
       ),
     );
