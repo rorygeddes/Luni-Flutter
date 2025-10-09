@@ -83,10 +83,17 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Transaction Queue'),
-        subtitle: _remainingCount > 0
-            ? Text('$_remainingCount transactions remaining')
-            : null,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Transaction Queue'),
+            if (_remainingCount > 0)
+              Text(
+                '$_remainingCount transactions remaining',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         backgroundColor: const Color(0xFFD4AF37), // Gold
       ),
       body: _isLoading
