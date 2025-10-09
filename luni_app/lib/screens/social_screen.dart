@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import '../services/messaging_service.dart';
 import '../services/auth_service.dart';
+import '../services/backend_service.dart';
 import '../models/conversation_model.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
@@ -19,9 +20,10 @@ class SocialScreen extends StatefulWidget {
 class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClientMixin {
   List<ConversationModel> _conversations = [];
   List<UserModel> _allUsers = [];
+  List<Map<String, dynamic>> _friends = [];
   bool _isLoading = true;
   bool _hasLoadedOnce = false;
-  int _selectedTab = 0; // 0 = Messages, 1 = Discover
+  int _selectedTab = 0; // 0 = Messages, 1 = Friends, 2 = Discover
 
   @override
   bool get wantKeepAlive => true;
@@ -38,13 +40,15 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
     try {
       final results = await Future.wait([
         MessagingService.getConversations(),
+        BackendService.getFriends(),
         MessagingService.getAllUsers(),
       ]);
 
       if (mounted) {
         setState(() {
           _conversations = results[0] as List<ConversationModel>;
-          _allUsers = results[1] as List<UserModel>;
+          _friends = results[1] as List<Map<String, dynamic>>;
+          _allUsers = results[2] as List<UserModel>;
           _isLoading = false;
           _hasLoadedOnce = true;
         });
@@ -95,7 +99,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             _buildHeader(),
             
             // Search bar button (only show in Discover tab)
-            if (_selectedTab == 1) _buildSearchButton(),
+            if (_selectedTab == 2) _buildSearchButton(),
             
             // Content
             Expanded(
@@ -103,7 +107,9 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                 onRefresh: _loadData,
                 child: _selectedTab == 0 
                     ? _buildMessagesTab() 
-                    : _buildDiscoverTab(),
+                    : _selectedTab == 1
+                        ? _buildFriendsTab()
+                        : _buildDiscoverTab(),
               ),
             ),
           ],
@@ -172,12 +178,37 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                         borderRadius: BorderRadius.circular(12.r),
                       ),
                       child: Text(
-                        'Discover',
+                        'Friends',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
                           color: _selectedTab == 1 
+                              ? Colors.white 
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTab = 2),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 2 
+                            ? const Color(0xFFEAB308) 
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      child: Text(
+                        'Discover',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: _selectedTab == 2 
                               ? Colors.white 
                               : Colors.grey.shade600,
                         ),
@@ -265,6 +296,55 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
       itemCount: _conversations.length,
       itemBuilder: (context, index) {
         return _buildConversationCard(_conversations[index]);
+      },
+    );
+  }
+
+  Widget _buildFriendsTab() {
+    if (_friends.isEmpty) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: MediaQuery.of(context).size.height - 200,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 64.w,
+                  color: Colors.grey.shade400,
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  'No friends yet',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  'Go to Discover to find and add friends',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      itemCount: _friends.length,
+      itemBuilder: (context, index) {
+        final friend = _friends[index];
+        return _buildFriendCard(friend);
       },
     );
   }
@@ -418,6 +498,92 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFriendCard(Map<String, dynamic> friend) {
+    final username = friend['username'] as String? ?? 'Unknown';
+    final email = friend['email'] as String? ?? '';
+    final profileImageUrl = friend['profile_image_url'] as String?;
+
+    return GestureDetector(
+      onTap: () async {
+        // Open chat with this friend
+        try {
+          final conversationId = await MessagingService.getOrCreateConversation(
+            friend['friend_user_id'] as String
+          );
+          
+          if (mounted) {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  conversationId: conversationId,
+                  otherUserId: friend['friend_user_id'] as String,
+                  otherUserName: username,
+                  otherUserAvatar: profileImageUrl,
+                ),
+              ),
+            );
+            
+            // Reload data
+            _loadData();
+          }
+        } catch (e) {
+          print('Error opening chat: $e');
+        }
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            _buildAvatar(profileImageUrl, username),
+            
+            SizedBox(width: 12.w),
+            
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    username,
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (email.isNotEmpty) ...[
+                    SizedBox(height: 2.h),
+                    Text(
+                      email,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            
+            // Message button
+            Icon(
+              Icons.chat_bubble_outline,
+              color: const Color(0xFFEAB308),
+              size: 20.w,
             ),
           ],
         ),

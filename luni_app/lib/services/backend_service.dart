@@ -1371,6 +1371,67 @@ class BackendService {
     }
   }
 
+  // ============== FRIENDS MANAGEMENT ==============
+
+  // Get user's friends (accepted only)
+  static Future<List<Map<String, dynamic>>> getFriends() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase.rpc('get_user_friends');
+
+      print('📋 Loaded ${(response as List).length} friends');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting friends: $e');
+      return [];
+    }
+  }
+
+  // Send friend request
+  static Future<bool> sendFriendRequest(String friendUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      await supabase.from('friends').insert({
+        'user_id': user.id,
+        'friend_id': friendUserId,
+        'status': 'pending',
+      });
+
+      print('✅ Friend request sent');
+      return true;
+    } catch (e) {
+      print('❌ Error sending friend request: $e');
+      return false;
+    }
+  }
+
+  // Accept friend request
+  static Future<bool> acceptFriendRequest(String friendUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      await supabase
+          .from('friends')
+          .update({'status': 'accepted'})
+          .eq('user_id', friendUserId)
+          .eq('friend_id', user.id);
+
+      print('✅ Friend request accepted');
+      return true;
+    } catch (e) {
+      print('❌ Error accepting friend request: $e');
+      return false;
+    }
+  }
+
   // ============== SPLIT & GROUP MANAGEMENT ==============
 
   // Get all groups the user is a member of
