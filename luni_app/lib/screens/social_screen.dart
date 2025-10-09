@@ -753,7 +753,6 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             ),
           ],
         ),
-      ),
     );
   }
 
