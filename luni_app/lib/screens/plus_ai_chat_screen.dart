@@ -406,18 +406,18 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFfdf3c6), // Light gold/cream (from Figma)
-            Colors.white.withOpacity(0.95),
-            Colors.white,
+            const Color(0xFFfdf3c6), // #fdf3c6 - Light warm cream/gold from Figma
+            const Color(0xFFfefbf0), // Subtle intermediate warm tone
+            const Color(0xFFffffff), // Pure white
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: const [0.0, 0.5, 1.0],
+          stops: const [0.0, 0.4, 1.0], // Steeper transition from gold to white
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFfdf3c6).withOpacity(0.2),
-            blurRadius: 8,
+            color: const Color(0xFFfdf3c6).withOpacity(0.15),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
