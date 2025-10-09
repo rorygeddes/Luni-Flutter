@@ -41,7 +41,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
 
       // Get user's financial overview
       final accounts = await BackendService.getAccounts();
-      final recentTransactions = await BackendService.getRecentTransactions(limit: 100);
+      final recentTransactions = await BackendService.getTransactions(limit: 100);
 
       double totalBalance = 0;
       for (var account in accounts) {
