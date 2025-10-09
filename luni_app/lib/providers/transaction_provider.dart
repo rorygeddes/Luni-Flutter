@@ -94,22 +94,8 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  // Update transaction with AI categorization
-  Future<void> _updateTransactionWithAI(String transactionId, TransactionCategorization categorization) async {
-    try {
-      final categoryId = _findCategoryId(categorization.category, categorization.subcategory);
-      
-      await _supabase
-          .from('transactions')
-          .update({
-            'ai_category_id': categoryId,
-            'ai_confidence': categorization.confidence,
-          })
-          .eq('id', transactionId);
-    } catch (e) {
-      // Handle error
-    }
-  }
+  // NOTE: AI categorization is now handled by OpenAI service and backend service
+  // See: lib/services/openai_service.dart and lib/services/backend_service.dart
 
   // Find category ID by parent and subcategory
   String? _findCategoryId(String parentKey, String subcategoryName) {
