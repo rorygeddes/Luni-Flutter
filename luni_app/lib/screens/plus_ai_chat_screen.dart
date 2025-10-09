@@ -361,53 +361,62 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Main content
-            Column(
-              children: [
-                // Header
-                _buildHeader(),
-                
-                // Messages
-                Expanded(
-                  child: _messages.isEmpty
-                      ? _buildEmptyState()
-                      : _buildMessageList(),
-                ),
-                
-                // Suggested questions (only show at start)
-                if (_messages.length <= 1 && _hasLoadedContext)
-                  _buildSuggestedQuestions(),
-                
-                // Input field
-                _buildInputField(),
-              ],
-            ),
-            
-            // Sidebar overlay
-            if (_showSidebar) _buildSidebar(),
-          ],
-        ),
+      body: Stack(
+        children: [
+          // Main content
+          Column(
+            children: [
+              // Header (extends into status bar)
+              _buildHeader(),
+              
+              // Messages
+              Expanded(
+                child: _messages.isEmpty
+                    ? _buildEmptyState()
+                    : _buildMessageList(),
+              ),
+              
+              // Suggested questions (only show at start)
+              if (_messages.length <= 1 && _hasLoadedContext)
+                _buildSuggestedQuestions(),
+              
+              // Input field
+              _buildInputField(),
+            ],
+          ),
+          
+          // Sidebar overlay
+          if (_showSidebar) _buildSidebar(),
+        ],
       ),
     );
   }
 
   Widget _buildHeader() {
     final isAgentMode = _currentMode == 'Agent Mode';
+    final statusBarHeight = MediaQuery.of(context).padding.top;
     
     return Container(
-      padding: EdgeInsets.all(20.w),
+      padding: EdgeInsets.only(
+        top: statusBarHeight + 12.h, // Status bar height + extra padding
+        left: 20.w,
+        right: 20.w,
+        bottom: 20.h,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFFEAB308), const Color(0xFFD4AF37)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFfdf3c6), // Light gold/cream (from Figma)
+            Colors.white.withOpacity(0.95),
+            Colors.white,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0.0, 0.5, 1.0],
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFEAB308).withOpacity(0.3),
+            color: const Color(0xFFfdf3c6).withOpacity(0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -418,7 +427,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           LuniIconButton(
             icon: Icons.menu,
             onPressed: () => setState(() => _showSidebar = !_showSidebar),
-            color: Colors.white,
+            color: Colors.black87,
             size: 24.w,
           ),
           SizedBox(width: 12.w),
@@ -426,9 +435,14 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              gradient: LinearGradient(
+                colors: isAgentMode 
+                    ? [const Color(0xFFEAB308), const Color(0xFFD4AF37)]
+                    : [const Color(0xFFf8d777), const Color(0xFFfdf0b6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
             ),
             child: Icon(
               isAgentMode ? Icons.psychology_rounded : Icons.chat_bubble_outline,
@@ -446,7 +460,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: Colors.black87,
                   ),
                 ),
                 Row(
@@ -455,7 +469,9 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                       width: 8.w,
                       height: 8.w,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isAgentMode 
+                            ? const Color(0xFFEAB308) 
+                            : Colors.green,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -464,7 +480,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                       _currentMode, // Shows 'Chat Mode' or 'Agent Mode'
                       style: TextStyle(
                         fontSize: 12.sp,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.grey.shade700,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -476,7 +492,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           LuniIconButton(
             icon: Icons.close,
             onPressed: () => Navigator.pop(context),
-            color: Colors.white,
+            color: Colors.black87,
             size: 24.w,
           ),
         ],
