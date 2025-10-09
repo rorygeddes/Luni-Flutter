@@ -24,6 +24,11 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   String? _currentConversationId;
   List<Map<String, dynamic>> _conversations = [];
   bool _showSidebar = false;
+  
+  // Agent Mode
+  bool _agentMode = true; // Default to agent mode
+  String? _agentThreadId; // OpenAI thread ID for agent conversations
+  final List<AgentAction> _agentActions = [];
 
   @override
   void initState() {
@@ -122,10 +127,19 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
       setState(() {
         _currentConversationId = conversationId;
         _messages.clear();
+        _agentActions.clear();
       });
 
+      // Create OpenAI agent thread if agent mode is enabled
+      if (_agentMode) {
+        _agentThreadId = await AIChatService.createAgentThread();
+        print('🤖 Agent thread created: $_agentThreadId');
+      }
+
       // Add welcome message and save it
-      final welcomeText = 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?';
+      final welcomeText = _agentMode
+          ? 'Hey! 👋 I\'m Luni Agent, your AI financial analyst. I can read your transactions, analyze spending patterns, and provide data-driven insights.\n\nAsk me anything about your finances!'
+          : 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?';
       
       setState(() {
         _messages.add(ChatMessage(
@@ -190,6 +204,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         timestamp: DateTime.now(),
       ));
       _isLoading = true;
+      _agentActions.clear(); // Clear previous agent actions
     });
 
     _scrollToBottom();
@@ -214,43 +229,117 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     }
 
     try {
-      // Build conversation history (last 10 messages for context)
-      final history = _messages
-          .where((m) => m.text != 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?') // Exclude welcome
-          .skip(_messages.length > 11 ? _messages.length - 11 : 0)
-          .take(10)
-          .map((m) => {
-                'role': m.isUser ? 'user' : 'assistant',
-                'content': m.text,
-              })
-          .toList();
+      if (_agentMode && _agentThreadId != null) {
+        // ======== AGENT MODE ========
+        print('🤖 Using Agent Mode');
+        
+        await AIChatService.sendMessageWithAgent(
+          userMessage: userMessage,
+          threadId: _agentThreadId!,
+          onAgentAction: (action, status, data) {
+            if (!mounted) return;
+            
+            setState(() {
+              if (status == 'running') {
+                _agentActions.add(AgentAction(
+                  name: action,
+                  status: 'running',
+                  description: _getActionDescription(action),
+                  data: data,
+                ));
+                print('🔄 Agent action: $action (running)');
+              } else if (status == 'complete') {
+                final index = _agentActions.indexWhere(
+                  (a) => a.name == action && a.status == 'running'
+                );
+                if (index != -1) {
+                  _agentActions[index] = _agentActions[index].copyWith(
+                    status: 'complete',
+                    data: data,
+                  );
+                  print('✅ Agent action: $action (complete)');
+                }
+              }
+            });
+            _scrollToBottom();
+          },
+          onResponse: (aiResponse) async {
+            if (!mounted) return;
+            
+            setState(() {
+              _messages.add(ChatMessage(
+                text: aiResponse,
+                isUser: false,
+                timestamp: DateTime.now(),
+              ));
+              _isLoading = false;
+            });
 
-      // Get AI response
-      final aiResponse = await AIChatService.sendMessage(
-        userMessage: userMessage,
-        conversationHistory: history,
-        financialContext: _financialContext,
-      );
+            await BackendService.saveAIMessage(
+              conversationId: _currentConversationId!,
+              role: 'assistant',
+              content: aiResponse,
+            );
 
-      // Add AI response
-      setState(() {
-        _messages.add(ChatMessage(
-          text: aiResponse,
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
-        _isLoading = false;
-      });
+            _scrollToBottom();
+          },
+          onError: (error) async {
+            if (!mounted) return;
+            
+            setState(() {
+              _messages.add(ChatMessage(
+                text: error,
+                isUser: false,
+                timestamp: DateTime.now(),
+              ));
+              _isLoading = false;
+            });
+            _scrollToBottom();
+          },
+        );
+      } else {
+        // ======== REGULAR MODE ========
+        print('💬 Using Regular Mode');
+        
+        // Build conversation history (last 10 messages for context)
+        final history = _messages
+            .where((m) => !m.text.startsWith('Hey! 👋')) // Exclude welcome
+            .skip(_messages.length > 11 ? _messages.length - 11 : 0)
+            .take(10)
+            .map((m) => {
+                  'role': m.isUser ? 'user' : 'assistant',
+                  'content': m.text,
+                })
+            .toList();
 
-      // Save AI response to database
-      await BackendService.saveAIMessage(
-        conversationId: _currentConversationId!,
-        role: 'assistant',
-        content: aiResponse,
-      );
+        // Get AI response
+        final aiResponse = await AIChatService.sendMessage(
+          userMessage: userMessage,
+          conversationHistory: history,
+          financialContext: _financialContext,
+        );
 
-      _scrollToBottom();
+        // Add AI response
+        setState(() {
+          _messages.add(ChatMessage(
+            text: aiResponse,
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+
+        // Save AI response to database
+        await BackendService.saveAIMessage(
+          conversationId: _currentConversationId!,
+          role: 'assistant',
+          content: aiResponse,
+        );
+
+        _scrollToBottom();
+      }
     } catch (e) {
+      print('❌ Error in _sendMessage: $e');
       setState(() {
         _messages.add(ChatMessage(
           text: 'Sorry, I encountered an error. Please try again! 🔄',
@@ -260,6 +349,21 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         _isLoading = false;
       });
       _scrollToBottom();
+    }
+  }
+  
+  String _getActionDescription(String action) {
+    switch (action) {
+      case 'get_transactions':
+        return 'Reading your transactions...';
+      case 'get_spending_by_category':
+        return 'Analyzing spending by category...';
+      case 'get_account_balances':
+        return 'Checking account balances...';
+      case 'find_transactions':
+        return 'Searching transactions...';
+      default:
+        return 'Processing...';
     }
   }
 
@@ -338,15 +442,17 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFEAB308), Color(0xFFD4AF37)],
+              gradient: LinearGradient(
+                colors: _agentMode 
+                    ? [const Color(0xFFEAB308), const Color(0xFFD4AF37)]
+                    : [Colors.blue.shade400, Colors.blue.shade600],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(12.r),
             ),
             child: Icon(
-              Icons.psychology_rounded,
+              _agentMode ? Icons.psychology_rounded : Icons.chat_bubble_outline,
               color: Colors.white,
               size: 24.w,
             ),
@@ -357,7 +463,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Luni AI',
+                  _agentMode ? 'Luni Agent' : 'Luni AI',
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
@@ -369,14 +475,14 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                     Container(
                       width: 8.w,
                       height: 8.w,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
+                      decoration: BoxDecoration(
+                        color: _agentMode ? const Color(0xFFEAB308) : Colors.green,
                         shape: BoxShape.circle,
                       ),
                     ),
                     SizedBox(width: 6.w),
                     Text(
-                      'Online',
+                      _agentMode ? 'Agent Mode' : 'Chat Mode',
                       style: TextStyle(
                         fontSize: 12.sp,
                         color: Colors.grey.shade600,
@@ -387,6 +493,37 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
               ],
             ),
           ),
+          // Agent mode toggle
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: _agentMode ? const Color(0xFFEAB308).withOpacity(0.1) : Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(
+                color: _agentMode ? const Color(0xFFEAB308) : Colors.blue.shade400,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _agentMode ? Icons.psychology : Icons.chat,
+                  size: 16.w,
+                  color: _agentMode ? const Color(0xFFEAB308) : Colors.blue.shade600,
+                ),
+                SizedBox(width: 6.w),
+                LuniSwitch(
+                  value: _agentMode,
+                  onChanged: (value) {
+                    setState(() => _agentMode = value);
+                    _createNewChat(); // Recreate chat with new mode
+                  },
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12.w),
           LuniIconButton(
             icon: Icons.close,
             onPressed: () => Navigator.pop(context),
@@ -434,14 +571,139 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-      itemCount: _messages.length + (_isLoading ? 1 : 0),
+      itemCount: _messages.length + _agentActions.length + (_isLoading ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == _messages.length) {
-          return _buildLoadingIndicator();
+        // Show messages first
+        if (index < _messages.length) {
+          return _buildMessageBubble(_messages[index]);
         }
-        return _buildMessageBubble(_messages[index]);
+        
+        // Show agent actions after messages
+        final actionIndex = index - _messages.length;
+        if (actionIndex < _agentActions.length) {
+          return _buildAgentAction(_agentActions[actionIndex]);
+        }
+        
+        // Show loading indicator last
+        return _buildLoadingIndicator();
       },
     );
+  }
+  
+  Widget _buildAgentAction(AgentAction action) {
+    final isComplete = action.status == 'complete';
+    
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16.h),
+      child: Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: isComplete 
+              ? Colors.green.shade50 
+              : const Color(0xFFEAB308).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: isComplete ? Colors.green : const Color(0xFFEAB308),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Status icon
+            Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: BoxDecoration(
+                color: isComplete ? Colors.green : const Color(0xFFEAB308),
+                shape: BoxShape.circle,
+              ),
+              child: isComplete 
+                  ? Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 20.w,
+                    )
+                  : SizedBox(
+                      width: 20.w,
+                      height: 20.w,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🤖 Agent Action',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    action.description,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (isComplete && action.data != null) ...[
+                    SizedBox(height: 6.h),
+                    Text(
+                      _getActionSummary(action),
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  String _getActionSummary(AgentAction action) {
+    if (action.data == null) return '';
+    
+    try {
+      switch (action.name) {
+        case 'get_transactions':
+          final count = action.data!['count'] ?? 0;
+          final total = action.data!['total_amount'] ?? 0.0;
+          return 'Found $count transactions totaling \$${total.toStringAsFixed(2)}';
+          
+        case 'get_spending_by_category':
+          final total = action.data!['total_spending'] ?? 0.0;
+          final categories = action.data!['categories'] as List? ?? [];
+          return 'Analyzed ${categories.length} categories, \$${total.toStringAsFixed(2)} total';
+          
+        case 'get_account_balances':
+          final total = action.data!['total_balance'] ?? 0.0;
+          final accounts = action.data!['accounts'] as List? ?? [];
+          return '${accounts.length} accounts, \$${total.toStringAsFixed(2)} total balance';
+          
+        case 'find_transactions':
+          final count = action.data!['count'] ?? 0;
+          return 'Found $count matching transactions';
+          
+        default:
+          return '';
+      }
+    } catch (e) {
+      return '';
+    }
   }
 
   Widget _buildMessageBubble(ChatMessage message) {
@@ -905,5 +1167,31 @@ class ChatMessage {
     required this.isUser,
     required this.timestamp,
   });
+}
+
+class AgentAction {
+  final String name;
+  final String status;
+  final String description;
+  final Map<String, dynamic>? data;
+
+  AgentAction({
+    required this.name,
+    required this.status,
+    required this.description,
+    this.data,
+  });
+
+  AgentAction copyWith({
+    String? status,
+    Map<String, dynamic>? data,
+  }) {
+    return AgentAction(
+      name: name,
+      status: status ?? this.status,
+      description: description,
+      data: data ?? this.data,
+    );
+  }
 }
 
