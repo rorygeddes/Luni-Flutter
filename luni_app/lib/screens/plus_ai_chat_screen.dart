@@ -218,6 +218,13 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
       ),
       child: Row(
         children: [
+          LuniIconButton(
+            icon: Icons.arrow_back,
+            onPressed: () => Navigator.pop(context),
+            color: Colors.black87,
+            iconSize: 24.w,
+          ),
+          SizedBox(width: 16.w),
           Container(
             width: 40.w,
             height: 40.w,

@@ -73,7 +73,6 @@ class _MainLayoutState extends State<MainLayout> {
                     children: [
                       LuniHomeScreen(),
                       TrackScreen(),
-                      PlusAIChatScreen(),
                       SplitScreen(),
                       SocialScreen(),
                     ],
@@ -162,10 +161,20 @@ class _MainLayoutState extends State<MainLayout> {
         children: [
           _buildNavItem(Icons.home, 'Home', _currentIndex == 0, () => _navigateToPage(0)),
           _buildNavItem(Icons.attach_money, 'Track', _currentIndex == 1, () => _navigateToPage(1)),
-          _buildNavItem(Icons.add, '', _currentIndex == 2, () => _navigateToPage(2), isCenter: true),
-          _buildNavItem(Icons.account_balance_wallet, 'Split', _currentIndex == 3, () => _navigateToPage(3)),
-          _buildNavItem(Icons.people, 'Social', _currentIndex == 4, () => _navigateToPage(4)),
+          _buildNavItem(Icons.add, '', false, () => _openAIChat(context), isCenter: true),
+          _buildNavItem(Icons.account_balance_wallet, 'Split', _currentIndex == 2, () => _navigateToPage(2)),
+          _buildNavItem(Icons.people, 'Social', _currentIndex == 3, () => _navigateToPage(3)),
         ],
+      ),
+    );
+  }
+
+  void _openAIChat(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PlusAIChatScreen(),
+        fullscreenDialog: true,
       ),
     );
   }
