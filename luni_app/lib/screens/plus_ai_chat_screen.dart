@@ -222,7 +222,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             icon: Icons.arrow_back,
             onPressed: () => Navigator.pop(context),
             color: Colors.black87,
-            iconSize: 24.w,
+            size: 24.w,
           ),
           SizedBox(width: 16.w),
           Container(
