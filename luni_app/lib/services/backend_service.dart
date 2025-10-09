@@ -1533,14 +1533,27 @@ class BackendService {
     try {
       final supabase = Supabase.instance.client;
 
-      // Join with profiles to get user info
-      final response = await supabase
+      // Get all group members first
+      final members = await supabase
           .from('group_members')
-          .select('*, profiles!inner(id, username, email)')
-          .eq('group_id', groupId);
+          .select('user_id')
+          .eq('group_id', groupId) as List<dynamic>;
 
-      print('📋 Loaded ${(response as List).length} members for group $groupId');
-      return (response as List).cast<Map<String, dynamic>>();
+      if (members.isEmpty) {
+        print('📋 No members found for group $groupId');
+        return [];
+      }
+
+      final memberIds = members.map((m) => m['user_id'] as String).toList();
+
+      // Manually fetch profile info for all members
+      final profiles = await supabase
+          .from('profiles')
+          .select('id, username, email, full_name, avatar_url')
+          .inFilter('id', memberIds) as List<dynamic>;
+
+      print('📋 Loaded ${profiles.length} members for group $groupId');
+      return profiles.cast<Map<String, dynamic>>();
     } catch (e) {
       print('❌ Error getting group members: $e');
       return [];

@@ -64,89 +64,105 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.r),
-                topRight: Radius.circular(20.r),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Handle bar
-                Container(
-                  margin: EdgeInsets.symmetric(vertical: 8.h),
-                  width: 40.w,
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2.r),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.9,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20.r),
+                    topRight: Radius.circular(20.r),
                   ),
                 ),
-                // Header
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Split Queue',
-                        style: TextStyle(
-                          fontSize: 20.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
+                child: Column(
+                  children: [
+                    // Handle bar
+                    Container(
+                      margin: EdgeInsets.symmetric(vertical: 8.h),
+                      width: 40.w,
+                      height: 4.h,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2.r),
                       ),
-                      const Spacer(),
-                      Text(
-                        '${_splitQueue.length} transaction${_splitQueue.length != 1 ? 's' : ''}',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Divider(height: 1, color: Colors.grey.shade200),
-                // Split Queue List
-                Expanded(
-                  child: _splitQueue.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle, size: 48.sp, color: Colors.grey.shade400),
-                              SizedBox(height: 12.h),
-                              Text(
-                                'No transactions to split',
-                                style: TextStyle(fontSize: 16.sp, color: Colors.grey.shade600),
-                              ),
-                            ],
+                    ),
+                    // Header
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Split Queue',
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        )
-                      : ListView.builder(
-                          controller: scrollController,
-                          padding: EdgeInsets.all(16.w),
-                          itemCount: _splitQueue.length,
-                          itemBuilder: (context, index) {
-                            return _SplitQueueCard(
-                              transaction: _splitQueue[index],
-                              groups: _groups,
-                              onSplitSubmitted: () {
-                                _loadSplitQueue();
-                                Navigator.pop(context);
+                          const Spacer(),
+                          Text(
+                            '${_splitQueue.length} transaction${_splitQueue.length != 1 ? 's' : ''}',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    // Split Queue List
+                    Expanded(
+                      child: _splitQueue.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle, size: 48.sp, color: Colors.grey.shade400),
+                                  SizedBox(height: 12.h),
+                                  Text(
+                                    'No transactions to split',
+                                    style: TextStyle(fontSize: 16.sp, color: Colors.grey.shade600),
+                                  ),
+                                  SizedBox(height: 12.h),
+                                  LuniTextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding: EdgeInsets.all(16.w),
+                              itemCount: _splitQueue.length,
+                              itemBuilder: (context, index) {
+                                return _SplitQueueCard(
+                                  transaction: _splitQueue[index],
+                                  groups: _groups,
+                                  onSplitSubmitted: () async {
+                                    // Reload queue and update modal state
+                                    await _loadSplitQueue();
+                                    setModalState(() {});
+                                    setState(() {}); // Update parent state too
+                                    
+                                    // Close modal if queue is now empty
+                                    if (_splitQueue.isEmpty) {
+                                      Navigator.pop(context);
+                                    }
+                                  },
+                                );
                               },
-                            );
-                          },
-                        ),
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
