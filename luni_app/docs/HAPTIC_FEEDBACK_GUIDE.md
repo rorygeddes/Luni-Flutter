@@ -4,9 +4,48 @@
 
 Haptic feedback provides tactile responses when users interact with the app, making it feel more responsive and premium (like World App, ChatGPT, etc.).
 
-## Setup
+## 🎯 Quick Start - Use Luni Widgets (Automatic Haptics!)
 
-The `HapticUtils` class (`lib/utils/haptic_utils.dart`) provides consistent haptic feedback across the app.
+**The easiest way:** Use Luni custom widgets that have haptic feedback built-in!
+
+### Replace Standard Widgets
+
+| Standard Flutter | Luni Widget (Auto Haptic) |
+|-----------------|---------------------------|
+| `GestureDetector` | `LuniGestureDetector` |
+| `ElevatedButton` | `LuniElevatedButton` |
+| `TextButton` | `LuniTextButton` |
+| `IconButton` | `LuniIconButton` |
+| `Switch` | `LuniSwitch` |
+| `Checkbox` | `LuniCheckbox` |
+| `FilterChip` | `LuniFilterChip` |
+| Custom button | `LuniButton` |
+
+### Import Once
+```dart
+import '../widgets/luni_button.dart';
+```
+
+### Use Anywhere
+```dart
+// Old way (no haptic)
+GestureDetector(
+  onTap: () => doSomething(),
+  child: Text('Tap me'),
+)
+
+// New way (automatic haptic!)
+LuniGestureDetector(
+  onTap: () => doSomething(), // Haptic happens automatically! ✨
+  child: Text('Tap me'),
+)
+```
+
+---
+
+## Manual Control (Advanced)
+
+The `HapticUtils` class (`lib/utils/haptic_utils.dart`) provides manual haptic feedback when you need custom control.
 
 ## Usage
 
@@ -124,6 +163,89 @@ GestureDetector(
 3. **Success/Error Patterns**: Use the built-in success/error methods for consistent feel
 4. **Performance**: Haptic calls are async but fast, no need to await in most cases
 
+## 📚 Luni Widget Examples
+
+### LuniButton - Custom Styled Button
+```dart
+LuniButton(
+  onPressed: () => submitForm(),
+  child: Text('Submit'),
+  isPrimary: true, // Gold background, medium impact
+)
+
+LuniButton(
+  onPressed: () => deleteItem(),
+  child: Text('Delete'),
+  isDestructive: true, // Red background, heavy impact
+)
+
+LuniButton(
+  onPressed: () => cancel(),
+  child: Text('Cancel'),
+  isPrimary: false, // Gray background, light impact
+)
+```
+
+### LuniGestureDetector - Drop-in Replacement
+```dart
+LuniGestureDetector(
+  onTap: () => openProfile(),
+  child: UserAvatar(),
+)
+```
+
+### LuniElevatedButton
+```dart
+LuniElevatedButton(
+  onPressed: () => save(),
+  child: Text('Save Changes'),
+)
+```
+
+### LuniSwitch & LuniCheckbox
+```dart
+LuniSwitch(
+  value: isEnabled,
+  onChanged: (value) => setState(() => isEnabled = value),
+)
+
+LuniCheckbox(
+  value: isChecked,
+  onChanged: (value) => setState(() => isChecked = value),
+)
+```
+
+### LuniFilterChip
+```dart
+LuniFilterChip(
+  selected: isSelected,
+  onSelected: (value) => setState(() => isSelected = value),
+  label: Text('Filter Option'),
+)
+```
+
+---
+
+## 🔄 Migration Guide
+
+### Step 1: Find and Replace
+
+Search your codebase for:
+- `GestureDetector` → `LuniGestureDetector`
+- `ElevatedButton` → `LuniElevatedButton`
+- `TextButton` → `LuniTextButton`
+- etc.
+
+### Step 2: Add Import
+```dart
+import '../widgets/luni_button.dart';
+```
+
+### Step 3: Done!
+All your buttons now have automatic haptic feedback! 🎉
+
+---
+
 ## Where It's Applied
 
 Currently implemented in:
@@ -133,5 +255,5 @@ Currently implemented in:
   - Add friend button (medium + success/error)
   - Message button (light)
 
-To add to other screens, follow the same pattern!
+**Next:** Migrate all screens to use Luni widgets for consistent haptic feedback everywhere!
 
