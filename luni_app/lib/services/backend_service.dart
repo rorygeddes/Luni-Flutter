@@ -1164,7 +1164,7 @@ class BackendService {
       final profile = await supabase
           .from('profiles')
           .select()
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
 
       // Process each transaction with AI if ai_description doesn't exist
