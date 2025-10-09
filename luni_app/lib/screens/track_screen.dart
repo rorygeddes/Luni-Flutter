@@ -415,7 +415,10 @@ class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClient
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.description ?? 'Unknown Transaction',
+                  // Show AI description if categorized, otherwise raw description
+                  transaction.isCategorized && transaction.aiDescription != null
+                      ? transaction.aiDescription!
+                      : transaction.description ?? 'Unknown Transaction',
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,

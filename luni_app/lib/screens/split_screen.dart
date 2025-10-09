@@ -825,28 +825,41 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
                     )
                   : null,
             ),
-            items: _allFriends.map((friend) {
-              final friendUserId = friend['friend_user_id'] as String?;
-              final username = friend['username'] as String? ?? 'Unknown';
+            items: () {
+              // Remove duplicates based on friend_user_id
+              final seenIds = <String>{};
+              final uniqueFriends = <DropdownMenuItem<String>>[];
               
-              return DropdownMenuItem<String>(
-                value: friendUserId,
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12.r,
-                      backgroundColor: const Color(0xFFD4AF37),
-                      child: Text(
-                        username.substring(0, 1).toUpperCase(),
-                        style: TextStyle(fontSize: 10.sp, color: Colors.white),
-                      ),
+              for (final friend in _allFriends) {
+                final friendUserId = friend['friend_user_id'] as String?;
+                if (friendUserId == null || seenIds.contains(friendUserId)) continue;
+                
+                seenIds.add(friendUserId);
+                final username = friend['username'] as String? ?? 'Unknown';
+                
+                uniqueFriends.add(
+                  DropdownMenuItem<String>(
+                    value: friendUserId,
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12.r,
+                          backgroundColor: const Color(0xFFD4AF37),
+                          child: Text(
+                            username.isNotEmpty ? username.substring(0, 1).toUpperCase() : '?',
+                            style: TextStyle(fontSize: 10.sp, color: Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(username),
+                      ],
                     ),
-                    SizedBox(width: 8.w),
-                    Text(username),
-                  ],
-                ),
-              );
-            }).toList(),
+                  ),
+                );
+              }
+              
+              return uniqueFriends;
+            }(),
             onChanged: (value) {
               setState(() {
                 _selectedPersonId = value;
