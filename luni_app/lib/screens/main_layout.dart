@@ -69,7 +69,7 @@ class _MainLayoutState extends State<MainLayout> {
                   child: PageView(
                     controller: _pageController,
                     onPageChanged: _onPageChanged,
-                    children: const [
+                    children: [
                       LuniHomeScreen(),
                       TrackScreen(),
                       AddScreen(),

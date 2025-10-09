@@ -6,6 +6,7 @@ import '../models/account_model.dart';
 import '../models/transaction_model.dart';
 import '../models/category_model.dart';
 import 'account_detail_screen.dart';
+import 'category_detail_screen.dart';
 
 class TrackScreen extends StatefulWidget {
   const TrackScreen({super.key});
@@ -14,11 +15,15 @@ class TrackScreen extends StatefulWidget {
   State<TrackScreen> createState() => _TrackScreenState();
 }
 
-class _TrackScreenState extends State<TrackScreen> {
+class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClientMixin {
   List<AccountModel> _accounts = [];
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
   bool _isLoading = true;
+  bool _hasLoadedOnce = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -35,18 +40,26 @@ class _TrackScreenState extends State<TrackScreen> {
         BackendService.getCategories(),
       ]);
       
+      print('📂 TrackScreen: Loaded ${(results[2] as List<CategoryModel>).length} categories from database');
+      
       if (mounted) {
         setState(() {
           _accounts = results[0] as List<AccountModel>;
           _transactions = results[1] as List<TransactionModel>;
           _categories = results[2] as List<CategoryModel>;
           _isLoading = false;
+          _hasLoadedOnce = true;
         });
+        
+        print('📂 TrackScreen: Categories in state: ${_categories.length}');
       }
     } catch (e) {
-      print('Error loading data: $e');
+      print('❌ Error loading data: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          if (!_hasLoadedOnce) _hasLoadedOnce = true;
+        });
       }
     }
   }
@@ -91,7 +104,9 @@ class _TrackScreenState extends State<TrackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
+    if (_isLoading && !_hasLoadedOnce) {
       return Container(
         color: Colors.white,
         child: const Center(
@@ -100,36 +115,54 @@ class _TrackScreenState extends State<TrackScreen> {
       );
     }
 
-    if (_accounts.isEmpty) {
+    if (_accounts.isEmpty && _hasLoadedOnce) {
       return Container(
         color: Colors.white,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                size: 64,
-                color: Colors.grey.shade400,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'No accounts connected',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Container(
+              height: MediaQuery.of(context).size.height - 200,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No accounts connected',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Connect your bank to see your transactions',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Pull down to refresh',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                'Connect your bank to see your transactions',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );
@@ -382,7 +415,7 @@ class _TrackScreenState extends State<TrackScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  transaction.description,
+                  transaction.description ?? 'Unknown Transaction',
                   style: TextStyle(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
@@ -446,15 +479,71 @@ class _TrackScreenState extends State<TrackScreen> {
   }
 
   Widget _buildCategoriesOverview(List<TransactionModel> transactions) {
-    final categorizedTransactions = transactions.where((t) => t.isCategorized).toList();
-    final categoryTotals = <String, double>{};
+    // Get parent categories only (where parent_key matches the category's own key)
+    final parentCategories = _categories
+        .where((cat) => cat.parentKey == cat.name.toLowerCase().replaceAll(' ', '_'))
+        .toList();
+
+    // Calculate totals for each subcategory
+    final categorizedTransactions = transactions.where((t) => t.isCategorized && t.subcategory != null).toList();
+    final subcategoryTotals = <String, double>{};
     
     for (final transaction in categorizedTransactions) {
-      if (transaction.category != null) {
-        categoryTotals[transaction.category!] = (categoryTotals[transaction.category!] ?? 0) + transaction.amount.abs();
+      if (transaction.subcategory != null) {
+        subcategoryTotals[transaction.subcategory!] = (subcategoryTotals[transaction.subcategory!] ?? 0) + transaction.amount.abs();
       }
     }
 
+    // Show empty state if NO categories are loaded at all
+    if (parentCategories.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Spending by Category',
+            style: TextStyle(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Container(
+            padding: EdgeInsets.all(20.w),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.category_outlined, size: 48, color: Colors.grey.shade400),
+                  SizedBox(height: 12.h),
+                  Text(
+                    'No categories found',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Pull down to refresh and load categories',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Show ALL parent categories with their subcategories
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -467,58 +556,147 @@ class _TrackScreenState extends State<TrackScreen> {
           ),
         ),
         SizedBox(height: 16.h),
-        ...categoryTotals.entries.map((entry) => _buildCategoryCard(entry.key, entry.value)).toList(),
+        ...parentCategories.map((parentCategory) {
+          // Get subcategories for this parent
+          final subcategories = _categories
+              .where((cat) => 
+                cat.parentKey == parentCategory.parentKey && 
+                cat.name != parentCategory.name
+              )
+              .toList();
+          
+          // Calculate total for parent (sum of all subcategories)
+          double parentTotal = 0.0;
+          for (final subcat in subcategories) {
+            parentTotal += subcategoryTotals[subcat.name] ?? 0.0;
+          }
+          
+          return _buildCategorySection(parentCategory, subcategories, subcategoryTotals, parentTotal);
+        }).toList(),
       ],
     );
   }
 
-  Widget _buildCategoryCard(String category, double amount) {
+  Widget _buildCategorySection(
+    CategoryModel parentCategory,
+    List<CategoryModel> subcategories,
+    Map<String, double> subcategoryTotals,
+    double parentTotal,
+  ) {
     return Container(
-      margin: EdgeInsets.only(bottom: 8.h),
-      padding: EdgeInsets.all(12.w),
+      margin: EdgeInsets.only(bottom: 16.h),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.shade200,
-            blurRadius: 2,
-            offset: const Offset(0, 1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
+          // Parent Category Header
           Container(
-            width: 24.w,
-            height: 24.w,
+            padding: EdgeInsets.all(16.w),
             decoration: BoxDecoration(
-              color: const Color(0xFFEAB308).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12.r),
+              color: const Color(0xFFEAB308).withOpacity(0.1),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(16.r),
+                topRight: Radius.circular(16.r),
+              ),
             ),
-            child: Icon(
-              Icons.category,
-              color: const Color(0xFFEAB308),
-              size: 12.w,
+            child: Row(
+              children: [
+                // Icon
+                Text(
+                  parentCategory.icon ?? '📊',
+                  style: TextStyle(fontSize: 28.sp),
+                ),
+                SizedBox(width: 12.w),
+                // Name
+                Expanded(
+                  child: Text(
+                    parentCategory.name,
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                // Total
+                Text(
+                  '\$${parentTotal.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFFEAB308),
+                  ),
+                ),
+              ],
             ),
           ),
+          
+          // Subcategories List
+          if (subcategories.isEmpty)
+            Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Text(
+                'No subcategories',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          else
+            ...subcategories.map((subcategory) {
+              final amount = subcategoryTotals[subcategory.name] ?? 0.0;
+              return _buildSubcategoryRow(subcategory, amount);
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubcategoryRow(CategoryModel subcategory, double amount) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Colors.grey.shade100, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Icon (smaller for subcategories)
+          Text(
+            subcategory.icon ?? '•',
+            style: TextStyle(fontSize: 20.sp),
+          ),
           SizedBox(width: 12.w),
+          // Name
           Expanded(
             child: Text(
-              category.replaceAll('_', ' ').toUpperCase(),
+              subcategory.name,
               style: TextStyle(
-                fontSize: 14.sp,
+                fontSize: 15.sp,
                 fontWeight: FontWeight.w500,
-                color: Colors.black,
+                color: Colors.black87,
               ),
             ),
           ),
+          // Amount
           Text(
             '\$${amount.toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 14.sp,
+              fontSize: 15.sp,
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: amount > 0 ? Colors.black : Colors.grey.shade500,
             ),
           ),
         ],
@@ -551,7 +729,7 @@ class _TrackScreenState extends State<TrackScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      transaction.description,
+                      transaction.description ?? 'Unknown Transaction',
                       style: TextStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w500,
@@ -661,7 +839,7 @@ class _TrackScreenState extends State<TrackScreen> {
         transactionId: transaction.id,
         category: category,
         subcategory: subcategory,
-        aiDescription: transaction.description,
+        aiDescription: transaction.description ?? 'Unknown Transaction',
       );
 
       // Reload data to show changes

@@ -18,16 +18,80 @@ import '../services/plaid_service.dart';
 import 'onboarding/onboarding_flow_screen.dart';
 import 'main_layout.dart';
 
-class LuniHomeScreen extends StatelessWidget {
+class LuniHomeScreen extends StatefulWidget {
   const LuniHomeScreen({super.key});
 
   @override
+  State<LuniHomeScreen> createState() => _LuniHomeScreenState();
+}
+
+class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAliveClientMixin {
+  UserModel? _userProfile;
+  Map<String, double> _categorySpending = {};
+  int _queueCount = 0;
+  bool _hasLoadedOnce = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (_hasLoadedOnce) return; // Only load once on initial mount
+    
+    try {
+      final user = await AuthService.getCurrentUserProfile();
+      final spending = await BackendService.getCategorySpending();
+      final queue = await BackendService.getUncategorizedTransactions();
+      
+      if (mounted) {
+        setState(() {
+          _userProfile = user;
+          _categorySpending = spending;
+          _queueCount = queue.length;
+          _hasLoadedOnce = true;
+        });
+      }
+    } catch (e) {
+      print('Error loading home screen data: $e');
+    }
+  }
+
+  Future<void> _refreshData() async {
+    try {
+      final user = await AuthService.getCurrentUserProfile();
+      final spending = await BackendService.getCategorySpending();
+      final queue = await BackendService.getUncategorizedTransactions();
+      
+      if (mounted) {
+        setState(() {
+          _userProfile = user;
+          _categorySpending = spending;
+          _queueCount = queue.length;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing home screen data: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     return Container(
       color: Colors.white, // White background for seamless scrolling
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 24.w),
-        child: Column(
+      child: RefreshIndicator(
+        onRefresh: _refreshData,
+        color: const Color(0xFFEAB308),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 24.w),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Greeting Section
@@ -67,35 +131,18 @@ class LuniHomeScreen extends StatelessWidget {
               child: _buildWalletSection(),
             ),
             SizedBox(height: 24.h),
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
     );
   }
 
   Widget _buildGreetingSection(BuildContext context) {
-    return FutureBuilder<UserModel?>(
-      future: AuthService.getCurrentUserProfile(),
-      builder: (context, snapshot) {
-        String userName = 'Student';
-        String userEmail = '';
-        
-        // Debug information
-        if (snapshot.hasError) {
-          print('Error loading profile: ${snapshot.error}');
-          userName = 'Error loading profile';
-        } else if (snapshot.connectionState == ConnectionState.waiting) {
-          userName = 'Loading...';
-        } else if (snapshot.hasData && snapshot.data != null) {
-          userName = snapshot.data!.fullName ?? 'Student';
-          userEmail = snapshot.data!.email ?? '';
-          print('Profile loaded: ${snapshot.data!.fullName} (${snapshot.data!.email})');
-        } else {
-          print('No profile data found');
-          userName = 'No profile found';
-        }
-        
-        return Container(
+    String userName = _userProfile?.fullName ?? 'Student';
+    String userEmail = _userProfile?.email ?? '';
+    
+    return Container(
           padding: EdgeInsets.symmetric(vertical: 16.h),
           child: Row(
             children: [
@@ -138,8 +185,6 @@ class LuniHomeScreen extends StatelessWidget {
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildSurveySection(BuildContext context) {
@@ -520,7 +565,7 @@ class LuniHomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12.r),
                     ),
                     child: Text(
-                      '0',
+                      '$_queueCount',
                       style: TextStyle(
                         fontSize: 12.sp,
                         fontWeight: FontWeight.w600,
@@ -853,17 +898,13 @@ class LuniHomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategorySpendingSection(BuildContext context) {
-    return FutureBuilder<Map<String, double>>(
-      future: BackendService.getCategorySpending(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
+    if (_categorySpending.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-        final categories = snapshot.data!;
-        final totalSpending = categories.values.fold(0.0, (a, b) => a + b);
+    final totalSpending = _categorySpending.values.fold(0.0, (a, b) => a + b);
 
-        return GestureDetector(
+    return GestureDetector(
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -914,7 +955,7 @@ class LuniHomeScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 16.h),
-              ...categories.entries.map((entry) {
+              ..._categorySpending.entries.map((entry) {
                 final percentage = (entry.value / totalSpending * 100).toStringAsFixed(1);
                 return _buildCategoryRow(
                   entry.key,
@@ -926,8 +967,6 @@ class LuniHomeScreen extends StatelessWidget {
           ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildCategoryRow(String category, double amount, String percentage) {

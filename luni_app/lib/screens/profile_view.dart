@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import 'auth/sign_in_screen.dart';
+import 'public_profile_preview_screen.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -11,10 +12,11 @@ class ProfileView extends StatefulWidget {
   State<ProfileView> createState() => _ProfileViewState();
 }
 
-class _ProfileViewState extends State<ProfileView> {
+class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClientMixin {
   UserModel? _userProfile;
   bool _isLoading = true;
   bool _isEditing = false;
+  bool _hasLoadedOnce = false;
   
   // User stats (set to 0 for now)
   int _lunis = 0;
@@ -25,6 +27,9 @@ class _ProfileViewState extends State<ProfileView> {
   final _schoolController = TextEditingController();
   final _ageController = TextEditingController();
   final _usernameController = TextEditingController();
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -47,6 +52,7 @@ class _ProfileViewState extends State<ProfileView> {
         setState(() {
           _userProfile = profile;
           _isLoading = false;
+          _hasLoadedOnce = true;
           
           // Initialize controllers with profile data
           if (profile != null) {
@@ -114,7 +120,9 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
+    if (_isLoading && !_hasLoadedOnce) {
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(
@@ -771,6 +779,11 @@ class _ProfileViewState extends State<ProfileView> {
                         ]),
                         SizedBox(height: 24.h),
                         
+                        _buildSettingsSection('Profile', [
+                          _buildSettingsItem('View Public Profile', Icons.visibility, null, null, onTap: _viewPublicProfile),
+                        ]),
+                        SizedBox(height: 24.h),
+                        
                         _buildSettingsSection('Account', [
                           _buildSettingsItem('Change Password', Icons.lock, null, null, onTap: _changePassword),
                           _buildSettingsItem('Sign Out', Icons.logout, null, null, onTap: _signOut),
@@ -848,6 +861,15 @@ class _ProfileViewState extends State<ProfileView> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _viewPublicProfile() {
+    Navigator.of(context).pop(); // Close settings modal
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const PublicProfilePreviewScreen(),
       ),
     );
   }

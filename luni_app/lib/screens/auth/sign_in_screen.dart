@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/auth_service.dart';
 import '../main_layout.dart';
 import 'sign_up_screen.dart';
@@ -20,10 +21,35 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _setupAuthListener() {
+    // Listen for auth state changes
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+      final session = data.session;
+      if (session != null && mounted) {
+        print('SignInScreen: User signed in via OAuth: ${session.user.email}');
+        // Handle OAuth callback and create profile if needed
+        await AuthService.handleOAuthCallback();
+        
+        // Navigate to main app
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const MainLayout(currentRoute: '/'),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _signIn() async {

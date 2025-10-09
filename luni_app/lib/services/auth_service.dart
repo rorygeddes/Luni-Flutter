@@ -219,9 +219,23 @@ class AuthService {
   // Get current user profile
   static Future<UserModel?> getCurrentUserProfile() async {
     final user = currentUser;
-    if (user == null) return null;
+    if (user == null) {
+      print('❌ No current user in auth');
+      return null;
+    }
     
-    return await getUserProfile(user.id);
+    print('🔐 Auth user ID: ${user.id}');
+    print('🔐 Auth user email: ${user.email}');
+    
+    final profile = await getUserProfile(user.id);
+    
+    if (profile != null) {
+      print('✅ Profile loaded: ${profile.username} (${profile.fullName}) - Email: ${profile.email}');
+    } else {
+      print('❌ No profile found for user ID: ${user.id}');
+    }
+    
+    return profile;
   }
 
   // Sign in with Google OAuth

@@ -11,6 +11,8 @@ class UserModel {
   final String? username;
   @JsonKey(name: 'avatar_url')
   final String? avatarUrl;
+  @JsonKey(name: 'etransfer_id')
+  final String? etransferId;
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
 
@@ -20,6 +22,7 @@ class UserModel {
     this.fullName,
     this.username,
     this.avatarUrl,
+    this.etransferId,
     this.createdAt,
   });
 
@@ -32,6 +35,7 @@ class UserModel {
     String? fullName,
     String? username,
     String? avatarUrl,
+    String? etransferId,
     DateTime? createdAt,
   }) {
     return UserModel(
@@ -40,6 +44,7 @@ class UserModel {
       fullName: fullName ?? this.fullName,
       username: username ?? this.username,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      etransferId: etransferId ?? this.etransferId,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -10,7 +10,8 @@ class TransactionModel {
   @JsonKey(name: 'account_id')
   final String accountId;
   final double amount;
-  final String description;
+  @JsonKey(defaultValue: 'Unknown Transaction')
+  final String? description;
   @JsonKey(name: 'merchant_name')
   final String? merchantName;
   final DateTime date;
@@ -30,7 +31,7 @@ class TransactionModel {
     required this.userId,
     required this.accountId,
     required this.amount,
-    required this.description,
+    this.description,
     this.merchantName,
     required this.date,
     this.category,

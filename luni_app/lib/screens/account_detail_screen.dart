@@ -249,7 +249,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
   Widget _buildTransactionCard(TransactionModel transaction) {
     final amount = transaction.amount;
     final isCategorized = transaction.category != null && transaction.subcategory != null;
-    final description = transaction.description;
+    final description = transaction.description ?? 'Unknown Transaction';
     final date = transaction.date;
     final category = transaction.category;
     final subcategory = transaction.subcategory;

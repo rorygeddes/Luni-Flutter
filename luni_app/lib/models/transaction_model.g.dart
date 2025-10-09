@@ -12,7 +12,7 @@ TransactionModel _$TransactionModelFromJson(Map<String, dynamic> json) =>
       userId: json['user_id'] as String,
       accountId: json['account_id'] as String,
       amount: (json['amount'] as num).toDouble(),
-      description: json['description'] as String,
+      description: json['description'] as String? ?? 'Unknown Transaction',
       merchantName: json['merchant_name'] as String?,
       date: DateTime.parse(json['date'] as String),
       category: json['category'] as String?,

@@ -100,7 +100,8 @@ class _AppInitializerState extends State<AppInitializer> {
         print('User signed in: ${session.user.email}');
         // Handle OAuth callback and create profile if needed
         await AuthService.handleOAuthCallback();
-        // Navigate to main app if not already there
+        
+        // Navigate to main app if we're on the initializer (not already in main app)
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(

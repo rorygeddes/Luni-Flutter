@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/category_model.dart';
+import '../models/transaction_model.dart';
 
 class BackendService {
   // Backend API base URL - you'll need to set up a backend server
@@ -464,6 +465,43 @@ class BackendService {
     }
   }
 
+  // Get transactions for a specific category/subcategory
+  static Future<List<TransactionModel>> getTransactionsByCategory(
+    String subcategoryName, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      var query = supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('subcategory', subcategoryName);
+
+      if (startDate != null) {
+        query = query.gte('date', startDate.toIso8601String().split('T')[0]);
+      }
+      
+      if (endDate != null) {
+        query = query.lte('date', endDate.toIso8601String().split('T')[0]);
+      }
+
+      final response = await query.order('date', ascending: false);
+
+      print('📊 Loaded ${response.length} transactions for category $subcategoryName');
+      return (response as List)
+          .map((json) => TransactionModel.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('❌ Error getting transactions for category: $e');
+      return [];
+    }
+  }
+
   // Get uncategorized transactions for the queue
   static Future<List<Map<String, dynamic>>> getUncategorizedTransactions({int limit = 5}) async {
     try {
@@ -589,41 +627,90 @@ class BackendService {
           final data = json.decode(response.body);
           final transactions = data['transactions'] as List<dynamic>;
 
-          // Save new transactions
+          // Save new transactions with duplicate detection
           int newCount = 0;
+          int duplicatesDetected = 0;
+          
           for (final transaction in transactions) {
             try {
+              final transactionId = transaction['transaction_id'];
+              final accountId = transaction['account_id'];
+              final amount = (transaction['amount'] ?? 0.0) * -1;
+              final description = transaction['name'] ?? 'Unknown';
+              final date = transaction['date'] ?? DateTime.now().toIso8601String().split('T')[0];
+              
+              // Check if transaction already exists (exact match by ID)
+              final existingById = await supabase
+                  .from('transactions')
+                  .select('id')
+                  .eq('id', transactionId)
+                  .maybeSingle();
+              
+              if (existingById != null) {
+                print('  ⏭️  Skipped (already exists): $description (\$$amount)');
+                continue;
+              }
+              
+              // Check for potential duplicates (same account, amount, description, within 3 days)
+              final potentialDuplicates = await supabase
+                  .rpc('find_potential_duplicates', params: {
+                    'p_account_id': accountId,
+                    'p_date': date,
+                    'p_amount': amount,
+                    'p_description': description,
+                    'p_transaction_id': transactionId,
+                  });
+              
+              bool isPotentialDuplicate = false;
+              String? duplicateOfId;
+              
+              if (potentialDuplicates != null && potentialDuplicates.isNotEmpty) {
+                final firstMatch = potentialDuplicates[0];
+                final matchScore = firstMatch['match_score'] ?? 0;
+                
+                // If match score >= 80, flag as potential duplicate
+                if (matchScore >= 80) {
+                  isPotentialDuplicate = true;
+                  duplicateOfId = firstMatch['id'];
+                  duplicatesDetected++;
+                  print('  🚨 Potential duplicate detected: $description (\$$amount) - Match score: $matchScore');
+                }
+              }
+              
               final transactionData = {
-                'id': transaction['transaction_id'],
+                'id': transactionId,
                 'user_id': user.id,
-                'account_id': transaction['account_id'],
-                'amount': (transaction['amount'] ?? 0.0) * -1,
+                'account_id': accountId,
+                'amount': amount,
                 'original_currency': transaction['iso_currency_code'] ?? 'CAD',
-                'description': transaction['name'] ?? 'Unknown',
+                'description': description,
                 'merchant_name': transaction['merchant_name'],
-                'date': transaction['date'] ?? DateTime.now().toIso8601String().split('T')[0],
+                'date': date,
                 'category': null,
                 'subcategory': null,
-                // Note: is_categorized and is_split will be added after running SQL fix
+                'is_potential_duplicate': isPotentialDuplicate,
+                'duplicate_of_transaction_id': duplicateOfId,
+                'duplicate_checked_at': isPotentialDuplicate ? DateTime.now().toIso8601String() : null,
                 'created_at': DateTime.now().toIso8601String(),
                 'updated_at': DateTime.now().toIso8601String(),
               };
               
-              // Upsert (insert or update if exists)
-              await supabase.from('transactions').upsert(transactionData);
+              // Insert transaction (with duplicate flag if applicable)
+              await supabase.from('transactions').insert(transactionData);
               
-              // Debug: Log new transactions
-              print('  📝 Saved transaction: ${transactionData['description']} (\$${transactionData['amount']}) on ${transactionData['date']}');
-              
-              // Balance will be dynamically calculated from opening_balance + new transactions
+              if (isPotentialDuplicate) {
+                print('  ⚠️  Added with duplicate flag: $description (\$$amount)');
+              } else {
+                print('  ✅ Saved: $description (\$$amount) on $date');
+              }
               
               newCount++;
             } catch (e) {
-              // Transaction might already exist, skip
+              print('  ⚠️  Error processing transaction: $e');
             }
           }
           
-          print('  ✅ Synced $newCount new transactions');
+          print('  ✅ Synced $newCount new transactions ($duplicatesDetected potential duplicates flagged)');
           totalNewTransactions += newCount;
         } else {
           print('  ❌ Error: ${response.body}');
@@ -644,6 +731,8 @@ class BackendService {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      print('📂 BackendService: Fetching categories for user ${user.id}');
+
       // Get default categories (user_id IS NULL) + user's custom categories
       final response = await supabase
           .from('categories')
@@ -653,11 +742,19 @@ class BackendService {
           .order('parent_key')
           .order('name');
 
+      print('📂 BackendService: Raw response count: ${(response as List).length}');
+
       final categories = (response as List)
           .map((json) => CategoryModel.fromJson(json))
           .toList();
 
-      print('📂 Loaded ${categories.length} categories');
+      print('📂 BackendService: Loaded ${categories.length} categories');
+      if (categories.isNotEmpty) {
+        print('📂 First 5 categories:');
+        for (var i = 0; i < categories.length && i < 5; i++) {
+          print('   - ${categories[i].name} (parent: ${categories[i].parentKey})');
+        }
+      }
       return categories;
     } catch (e) {
       print('❌ Error getting categories: $e');
@@ -985,6 +1082,136 @@ class BackendService {
     } catch (e) {
       print('❌ Error getting category spending: $e');
       return {};
+    }
+  }
+
+  // Get uncategorized transactions with potential duplicates prioritized
+  static Future<List<Map<String, dynamic>>> getUncategorizedTransactionsWithPriority() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get potential duplicates first (high priority)
+      final duplicates = await supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('is_potential_duplicate', true)
+          .order('duplicate_checked_at', ascending: false)
+          .limit(5);
+
+      // Get regular uncategorized transactions
+      final regular = await supabase
+          .from('transactions')
+          .select()
+          .eq('user_id', user.id)
+          .or('category.is.null,is_categorized.eq.false')
+          .eq('is_potential_duplicate', false)
+          .order('date', ascending: false)
+          .limit(5 - duplicates.length);
+
+      // Combine with duplicates first
+      return [...duplicates, ...regular];
+    } catch (e) {
+      print('❌ Error getting prioritized transactions: $e');
+      throw e;
+    }
+  }
+
+  // Confirm duplicate and move to deleted_transactions
+  static Future<bool> confirmDuplicate(String transactionId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final result = await supabase.rpc('move_to_deleted_transactions', params: {
+        'p_transaction_id': transactionId,
+        'p_reason': 'duplicate',
+      });
+
+      print('✅ Transaction moved to deleted items');
+      return result == true;
+    } catch (e) {
+      print('❌ Error confirming duplicate: $e');
+      return false;
+    }
+  }
+
+  // Reject duplicate flag (mark as not duplicate)
+  static Future<bool> rejectDuplicate(String transactionId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      await supabase
+          .from('transactions')
+          .update({
+            'is_potential_duplicate': false,
+            'duplicate_of_transaction_id': null,
+            'duplicate_checked_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', transactionId);
+
+      print('✅ Transaction marked as not a duplicate');
+      return true;
+    } catch (e) {
+      print('❌ Error rejecting duplicate: $e');
+      return false;
+    }
+  }
+
+  // Get deleted transactions (recoverable)
+  static Future<List<Map<String, dynamic>>> getDeletedTransactions() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final result = await supabase
+          .from('deleted_transactions')
+          .select()
+          .eq('user_id', user.id)
+          .eq('can_recover', true)
+          .order('deleted_at', ascending: false);
+
+      return result;
+    } catch (e) {
+      print('❌ Error getting deleted transactions: $e');
+      throw e;
+    }
+  }
+
+  // Recover deleted transaction
+  static Future<bool> recoverDeletedTransaction(String transactionId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final result = await supabase.rpc('recover_deleted_transaction', params: {
+        'p_transaction_id': transactionId,
+      });
+
+      print('✅ Transaction recovered');
+      return result == true;
+    } catch (e) {
+      print('❌ Error recovering transaction: $e');
+      return false;
+    }
+  }
+
+  // Permanently delete from deleted_transactions
+  static Future<bool> permanentlyDeleteTransaction(String transactionId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      await supabase
+          .from('deleted_transactions')
+          .delete()
+          .eq('id', transactionId);
+
+      print('✅ Transaction permanently deleted');
+      return true;
+    } catch (e) {
+      print('❌ Error permanently deleting transaction: $e');
+      return false;
     }
   }
 }
