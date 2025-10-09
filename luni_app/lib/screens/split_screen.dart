@@ -840,6 +840,10 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                             : null,
                       );
 
+                      if (groupId == null) {
+                        throw Exception('Failed to create group');
+                      }
+
                       // Add selected friends to the group
                       for (final friendId in selectedFriends) {
                         await BackendService.addGroupMember(
