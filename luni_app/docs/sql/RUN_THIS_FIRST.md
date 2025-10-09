@@ -27,6 +27,12 @@ docs/sql/FIX_SPLIT_RLS_POLICIES.sql
 ```
 (Fixes infinite recursion error in split_transactions)
 
+**Then run this fix for Groups RLS policies:**
+```sql
+docs/sql/FIX_GROUPS_RLS.sql
+```
+(Fixes infinite recursion error in groups and group_members - REQUIRED to create groups!)
+
 ## 3. Duplicate Detection (if not already run)
 ```sql
 -- Run this for Transaction Queue duplicate detection

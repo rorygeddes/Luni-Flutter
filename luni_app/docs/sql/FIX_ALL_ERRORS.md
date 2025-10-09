@@ -14,33 +14,16 @@ Run these SQL scripts **in order**:
 ### 2. Fix Split RLS Policies (Infinite Recursion Error)
 ```sql
 -- File: docs/sql/FIX_SPLIT_RLS_POLICIES.sql
--- This fixes the circular reference in RLS policies
+-- This fixes the circular reference in split RLS policies
 ```
 **Run this file in Supabase!**
 
-### 3. Fix Group Members RLS Policy (if needed)
+### 3. Fix Groups RLS Policies (Infinite Recursion Error)
 ```sql
--- Add this to Supabase if you still get group_members errors:
-
--- Drop old policy
-DROP POLICY IF EXISTS "Users can view group members they belong to" ON group_members;
-
--- Create simpler policy
-CREATE POLICY "Users can view group members they belong to"
-ON group_members FOR SELECT
-USING (user_id = auth.uid());
-
--- Add policy for group owners to see members
-CREATE POLICY "Group creators can see all members"
-ON group_members FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM groups g 
-    WHERE g.id = group_members.group_id 
-    AND g.created_by = auth.uid()
-  )
-);
+-- File: docs/sql/FIX_GROUPS_RLS.sql
+-- This fixes the circular reference in groups and group_members RLS policies
 ```
+**Run this file in Supabase!** (This is critical for creating groups)
 
 ---
 
