@@ -1694,8 +1694,7 @@ class BackendService {
       final members = await supabase
           .from('group_members')
           .select('user_id')
-          .eq('group_id', groupId)
-          .cast<List<dynamic>>();
+          .eq('group_id', groupId) as List<dynamic>;
 
       final memberIds = members.map((m) => m['user_id'] as String).toList();
       
@@ -1703,8 +1702,7 @@ class BackendService {
       final profiles = await supabase
           .from('profiles')
           .select('id, username, full_name, avatar_url')
-          .in_('id', memberIds)
-          .cast<List<dynamic>>();
+          .inFilter('id', memberIds) as List<dynamic>;
 
       // Get all split transactions for this group
       final splits = await supabase
@@ -1715,8 +1713,7 @@ class BackendService {
             split_participants(user_id, amount_owed, is_settled)
           ''')
           .eq('group_id', groupId)
-          .order('created_at', ascending: false)
-          .cast<List<dynamic>>();
+          .order('created_at', ascending: false) as List<dynamic>;
 
       // Calculate balances for each member
       final Map<String, double> balances = {};
@@ -1779,8 +1776,7 @@ class BackendService {
             split_participants!inner(user_id, amount_owed, is_settled)
           ''')
           .or('payer_id.eq.${user.id},payer_id.eq.$otherUserId')
-          .order('created_at', ascending: false)
-          .cast<List<dynamic>>();
+          .order('created_at', ascending: false) as List<dynamic>;
 
       // Filter to only splits involving both users
       final relevantSplits = splits.where((split) {

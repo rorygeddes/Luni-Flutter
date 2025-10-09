@@ -225,9 +225,9 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
             style: TextStyle(
               fontSize: 18.sp,
               fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
+                      ),
+                    ),
+                    const Spacer(),
               LuniTextButton(
                 onPressed: () => _showCreateGroupDialog(),
                 style: TextButton.styleFrom(
@@ -241,10 +241,10 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                     Text('Create'),
                   ],
                 ),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
 
         // Groups List
         Container(
@@ -468,8 +468,8 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                   ),
                 ),
               ],
-            ),
-          ),
+        ),
+      ),
     );
   }
 
@@ -477,7 +477,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
       child: Row(
-            children: [
+        children: [
           Text(
             title,
             style: TextStyle(
@@ -520,185 +520,6 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
     );
   }
 
-  // Removed old _buildSplitQueueItem - now using _SplitQueueCard widget below
-
-  Widget _buildGroupsList(List<Map<String, dynamic>> groups) {
-    return Column(
-      children: groups.map((group) => _buildGroupCard(group)).toList(),
-    );
-  }
-
-  Widget _buildGroupCard(Map<String, dynamic> group) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48.w,
-            height: 48.w,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAB308).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12.r),
-            ),
-            child: Center(
-              child: Text(
-                group['icon'],
-                style: TextStyle(fontSize: 24.sp),
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  group['name'],
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  '${group['member_count']} members • ${group['description']}',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${group['total_owed'].toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: group['total_owed'] >= 0 ? Colors.green : Colors.red,
-                ),
-              ),
-              SizedBox(height: 2.h),
-              Text(
-                group['total_owed'] >= 0 ? 'you are owed' : 'you owe',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPeopleList(List<Map<String, dynamic>> people) {
-    return Column(
-      children: people.map((person) => _buildPersonCard(person)).toList(),
-    );
-  }
-
-  Widget _buildPersonCard(Map<String, dynamic> person) {
-    final isOwed = person['total_owed'] >= 0;
-    final amount = person['total_owed'].abs();
-    
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40.w,
-            height: 40.w,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                person['avatar'],
-                style: TextStyle(fontSize: 20.sp),
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  person['name'],
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  person['email'],
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${amount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                  color: isOwed ? Colors.green : Colors.red,
-                ),
-              ),
-              SizedBox(height: 2.h),
-              Text(
-                isOwed ? 'owes you' : 'you owe',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showCreateGroupDialog() {
     final nameController = TextEditingController();
     final iconController = TextEditingController(text: '👥');
@@ -712,15 +533,15 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           height: MediaQuery.of(context).size.height * 0.8,
-          decoration: BoxDecoration(
-            color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(20.r),
               topRight: Radius.circular(20.r),
             ),
-          ),
-          child: Column(
-            children: [
+      ),
+      child: Column(
+        children: [
               // Drag handle
               Container(
                 width: 40.w,
@@ -737,12 +558,12 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                 padding: EdgeInsets.symmetric(horizontal: 24.w),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
+            children: [
                     Text(
                       'Create Group',
-                      style: TextStyle(
+                  style: TextStyle(
                         fontSize: 20.sp,
-                        fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w600,
                         color: Colors.black,
                       ),
                     ),
@@ -825,14 +646,14 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                       SizedBox(height: 24.h),
 
                       // Select Friends
-                      Text(
+              Text(
                         'Add Friends',
-                        style: TextStyle(
+                style: TextStyle(
                           fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          SizedBox(height: 8.h),
                       Text(
                         'Select friends to add to this group',
                         style: TextStyle(
@@ -844,7 +665,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                       SizedBox(height: 12.h),
 
                       if (_friends.isEmpty)
-                        Container(
+          Container(
                           padding: EdgeInsets.all(16.w),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade50,
@@ -876,8 +697,8 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                             },
                             child: Container(
                               margin: EdgeInsets.only(bottom: 8.h),
-                              padding: EdgeInsets.all(12.w),
-                              decoration: BoxDecoration(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
                                 color: isSelected
                                     ? const Color(0xFFD4AF37).withOpacity(0.1)
                                     : Colors.grey.shade50,
@@ -888,9 +709,9 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                       : Colors.grey.shade200,
                                   width: 2,
                                 ),
-                              ),
-                              child: Row(
-                                children: [
+            ),
+            child: Row(
+              children: [
                                   CircleAvatar(
                                     radius: 20.r,
                                     backgroundImage: friend['avatar_url'] != null
@@ -901,15 +722,15 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                         : null,
                                   ),
                                   SizedBox(width: 12.w),
-                                  Expanded(
-                                    child: Text(
+                Expanded(
+                  child: Text(
                                       friendName,
-                                      style: TextStyle(
-                                        fontSize: 14.sp,
+                    style: TextStyle(
+                      fontSize: 14.sp,
                                         fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
+                    ),
+                  ),
+                ),
                                   if (isSelected)
                                     const Icon(
                                       Icons.check_circle,
@@ -1071,7 +892,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                 padding: EdgeInsets.symmetric(horizontal: 24.w),
                 child: Row(
                   children: [
-                    Text(
+                Text(
                       group['icon'] ?? '👥',
                       style: TextStyle(fontSize: 32.sp),
                     ),
@@ -1090,14 +911,14 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                           if (group['description'] != null && (group['description'] as String).isNotEmpty)
                             Text(
                               group['description'] as String,
-                              style: TextStyle(
-                                fontSize: 14.sp,
+                  style: TextStyle(
+                    fontSize: 14.sp,
                                 color: Colors.grey.shade600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
                     LuniIconButton(
                       icon: Icons.close,
                       onPressed: () => Navigator.pop(context),
@@ -1147,9 +968,9 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                 child: member['avatar_url'] == null
                                     ? Text(name[0].toUpperCase())
                                     : null,
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
                                 child: Text(name),
                               ),
                               if (balance.abs() > 0.01)
@@ -1195,8 +1016,8 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                             padding: EdgeInsets.all(12.w),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -1211,9 +1032,9 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                     Text(
                                       '\$${amount.toStringAsFixed(2)}',
                                       style: TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
+              ),
+            ],
+          ),
                                 SizedBox(height: 4.h),
                                 Text(
                                   '${date.day}/${date.month}/${date.year}',
@@ -1222,9 +1043,9 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
+        ],
+      ),
+    );
                         }).toList(),
                     ],
                   ),
@@ -1266,21 +1087,21 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
         backgroundColor: Colors.transparent,
         builder: (context) => Container(
           height: MediaQuery.of(context).size.height * 0.85,
-          decoration: BoxDecoration(
-            color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(20.r),
               topRight: Radius.circular(20.r),
             ),
           ),
           child: Column(
-            children: [
+        children: [
               // Drag handle
-              Container(
+          Container(
                 width: 40.w,
                 height: 4.h,
                 margin: EdgeInsets.symmetric(vertical: 12.h),
-                decoration: BoxDecoration(
+            decoration: BoxDecoration(
                   color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2.r),
                 ),
@@ -1304,23 +1125,23 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                           : null,
                     ),
                     SizedBox(width: 12.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                             personName,
-                            style: TextStyle(
+                  style: TextStyle(
                               fontSize: 20.sp,
                               fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                  ),
+                ),
                           if (balance.abs() > 0.01)
-                            Text(
+                Text(
                               isOwed
                                   ? 'Owes you \$${balance.toStringAsFixed(2)}'
                                   : 'You owe \$${balance.abs().toStringAsFixed(2)}',
-                              style: TextStyle(
+                  style: TextStyle(
                                 fontSize: 14.sp,
                                 color: isOwed ? Colors.green : Colors.red,
                                 fontWeight: FontWeight.w600,
@@ -1331,12 +1152,12 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                               'Settled up',
                               style: TextStyle(
                                 fontSize: 14.sp,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
                     LuniIconButton(
                       icon: Icons.close,
                       onPressed: () => Navigator.pop(context),
@@ -1353,17 +1174,17 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                   padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
+            children: [
+              Text(
                         'Transactions',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
                       SizedBox(height: 8.h),
                       if (transactions.isEmpty)
-                        Text(
+              Text(
                           'No transactions yet',
                           style: TextStyle(color: Colors.grey.shade600),
                         )
@@ -1403,13 +1224,13 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                                 SizedBox(height: 4.h),
                                 Text(
                                   '${date.day}/${date.month}/${date.year}',
-                                  style: TextStyle(
+                style: TextStyle(
                                     fontSize: 12.sp,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
                           );
                         }).toList(),
                     ],
@@ -1576,7 +1397,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
     final amountPerPerson = splitCount > 0 
         ? amount / splitCount 
         : amount;
-
+    
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
       padding: EdgeInsets.all(16.w),
@@ -1598,29 +1419,29 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           // Header
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                       description,
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      '${date.month}/${date.day}/${date.year}',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
+                    SizedBox(height: 4.h),
+                Text(
+                      '${date.month}/${date.day}/${date.year}',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
               Text(
                 '\$${amount.toStringAsFixed(2)}',
                 style: TextStyle(
@@ -1746,9 +1567,9 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
 
           // Members Selection
           if (_selectedGroupId != null) ...[
-            Text(
+              Text(
               'Select People to Split With:',
-              style: TextStyle(
+                style: TextStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
                 color: Colors.black87,
