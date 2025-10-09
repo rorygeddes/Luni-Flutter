@@ -75,6 +75,106 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
     _loadData();
   }
 
+  void _showPublicProfile(String userId, String userName, String? avatarUrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20.r),
+                topRight: Radius.circular(20.r),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  margin: EdgeInsets.symmetric(vertical: 8.h),
+                  width: 40.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Public Profile',
+                        style: TextStyle(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: Colors.grey.shade200),
+                // Profile Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: Padding(
+                      padding: EdgeInsets.all(24.w),
+                      child: Column(
+                        children: [
+                          // Avatar
+                          _buildAvatar(avatarUrl, userName),
+                          SizedBox(height: 16.h),
+                          // Name
+                          Text(
+                            userName,
+                            style: TextStyle(
+                              fontSize: 24.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 24.h),
+                          // Categories Section
+                          Text(
+                            'Spending Categories',
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 16.h),
+                          Text(
+                            'User categories will appear here',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -508,85 +608,92 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   Widget _buildFriendCard(Map<String, dynamic> friend) {
     final username = friend['username'] as String? ?? 'Unknown';
     final email = friend['email'] as String? ?? '';
-    final profileImageUrl = friend['profile_image_url'] as String?;
+    final fullName = friend['full_name'] as String?;
+    final avatarUrl = friend['avatar_url'] as String?;
+    final friendUserId = friend['friend_user_id'] as String;
 
-    return GestureDetector(
-      onTap: () async {
-        // Open chat with this friend
-        try {
-          final conversationId = await MessagingService.getOrCreateConversation(
-            friend['friend_user_id'] as String
-          );
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          // Avatar - Click to view profile
+          GestureDetector(
+            onTap: () => _showPublicProfile(friendUserId, fullName ?? username, avatarUrl),
+            child: _buildAvatar(avatarUrl, fullName ?? username),
+          ),
           
-          if (mounted) {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  conversationId: conversationId,
-                  otherUserId: friend['friend_user_id'] as String,
-                  otherUserName: username,
-                  otherUserAvatar: profileImageUrl,
-                ),
-              ),
-            );
-            
-            // Reload data
-            _loadData();
-          }
-        } catch (e) {
-          print('Error opening chat: $e');
-        }
-      },
-      child: Container(
-        margin: EdgeInsets.only(bottom: 12.h),
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            // Avatar
-            _buildAvatar(profileImageUrl, username),
-            
-            SizedBox(width: 12.w),
-            
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    username,
+          SizedBox(width: 12.w),
+          
+          // Content - Click name to view profile
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GestureDetector(
+                  onTap: () => _showPublicProfile(friendUserId, fullName ?? username, avatarUrl),
+                  child: Text(
+                    fullName ?? username,
                     style: TextStyle(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
-                  if (email.isNotEmpty) ...[
-                    SizedBox(height: 2.h),
-                    Text(
-                      email,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.grey.shade600,
+                ),
+                if (email.isNotEmpty) ...[
+                  SizedBox(height: 2.h),
+                  Text(
+                    email,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          
+          // Message button
+          GestureDetector(
+            onTap: () async {
+              // Open chat with this friend
+              try {
+                final conversationId = await MessagingService.getOrCreateConversation(friendUserId);
+                
+                if (mounted) {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        conversationId: conversationId,
+                        otherUserId: friendUserId,
+                        otherUserName: fullName ?? username,
+                        otherUserAvatar: avatarUrl,
                       ),
                     ),
-                  ],
-                ],
-              ),
-            ),
-            
-            // Message button
-            Icon(
+                  );
+                  
+                  // Reload data
+                  _loadData();
+                }
+              } catch (e) {
+                print('Error opening chat: $e');
+              }
+            },
+            child: Icon(
               Icons.chat_bubble_outline,
               color: const Color(0xFFEAB308),
               size: 20.w,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -607,28 +714,32 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             
             SizedBox(width: 12.w),
             
-            // Content
+            // Content - Click to view profile
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user.fullName ?? 'User',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+              child: GestureDetector(
+                onTap: () => _showPublicProfile(user.id, user.fullName ?? user.username ?? 'User', user.avatarUrl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.fullName ?? 'User',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 2.h),
-                  Text(
-                    '@${user.username ?? 'user'}',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey.shade600,
+                    SizedBox(height: 2.h),
+                    Text(
+                      '@${user.username ?? 'user'}',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             

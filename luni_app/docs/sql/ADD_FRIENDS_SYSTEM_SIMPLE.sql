@@ -48,7 +48,8 @@ RETURNS TABLE (
   friend_user_id UUID,
   username TEXT,
   email TEXT,
-  profile_image_url TEXT
+  full_name TEXT,
+  avatar_url TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -56,7 +57,8 @@ BEGIN
     p.id as friend_user_id,
     p.username,
     p.email,
-    p.profile_image_url
+    p.full_name,
+    p.avatar_url
   FROM friends f
   JOIN profiles p ON (
     CASE 
