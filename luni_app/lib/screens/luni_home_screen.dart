@@ -8,6 +8,7 @@ import '../services/navigation_service.dart';
 import '../services/auth_service.dart';
 import '../services/backend_service.dart';
 import '../models/user_model.dart';
+import '../widgets/luni_button.dart';
 import 'budget_modal.dart';
 import 'wallet_modal.dart';
 import 'daily_report_modal.dart';
@@ -119,14 +120,14 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
             SizedBox(height: 16.h),
 
             // Current Budget Overview (Clickable)
-            GestureDetector(
+            LuniGestureDetector(
               onTap: () => NavigationService.navigateToModal(const BudgetModal()),
               child: _buildBudgetOverview(),
             ),
             SizedBox(height: 16.h),
 
             // Current Wallet & Accounts (Clickable)
-            GestureDetector(
+            LuniGestureDetector(
               onTap: () => NavigationService.navigateToModal(const WalletModal()),
               child: _buildWalletSection(),
             ),
@@ -234,8 +235,8 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
+              onPressed: () async {
+                await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const OnboardingFlowScreen(),
                   ),
@@ -258,7 +259,7 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
   }
 
   Widget _buildStatCard(String value, IconData icon, VoidCallback onTap) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -330,7 +331,7 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
                       color: Colors.black,
                     ),
                   ),
-                  GestureDetector(
+                  LuniGestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
                       width: 32.w,
@@ -611,7 +612,7 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
   }
 
   Widget _buildDailyReportButton(BuildContext context) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: () => NavigationService.navigateToModal(const DailyReportModal()),
       child: Container(
         width: double.infinity,
@@ -904,7 +905,7 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
 
     final totalSpending = _categorySpending.values.fold(0.0, (a, b) => a + b);
 
-    return GestureDetector(
+    return LuniGestureDetector(
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(

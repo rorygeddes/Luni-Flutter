@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import 'luni_home_screen.dart';
 import 'track_screen.dart';
 import 'split_screen.dart';
@@ -117,7 +118,7 @@ class _MainLayoutState extends State<MainLayout> {
             Row(
               children: [
                 // Notification button
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () => _showNotifications(context),
                   child: Container(
                     width: 32.w,
@@ -136,7 +137,7 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
                 SizedBox(width: 12.w),
                     // Profile button
-                    GestureDetector(
+                    LuniGestureDetector(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (context) => const ProfileView()),
                       ),
@@ -230,7 +231,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap, {bool isCenter = false}) {
     if (isCenter) {
-      return GestureDetector(
+      return LuniGestureDetector(
         onTap: onTap,
         child: Container(
           width: 48.w,
@@ -252,7 +253,7 @@ class _MainLayoutState extends State<MainLayout> {
       );
     }
 
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
