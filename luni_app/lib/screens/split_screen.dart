@@ -233,14 +233,18 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                 ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  // TODO: Show create group dialog
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Create'),
+              LuniTextButton(
+                onPressed: () => _showCreateGroupDialog(),
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFFD4AF37),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.add, size: 18),
+                    SizedBox(width: 4),
+                    Text('Create'),
+                  ],
                 ),
               ),
             ],
@@ -1006,6 +1010,332 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showCreateGroupDialog() {
+    final nameController = TextEditingController();
+    final iconController = TextEditingController(text: '👥');
+    final descriptionController = TextEditingController();
+    final selectedFriends = <String>{};
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.r),
+              topRight: Radius.circular(20.r),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                width: 40.w,
+                height: 4.h,
+                margin: EdgeInsets.only(top: 8.h, bottom: 16.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Create Group',
+                      style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    LuniGestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: Container(
+                        width: 32.w,
+                        height: 32.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: Colors.black,
+                          size: 20.w,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 24.h),
+
+              // Form Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Group Name
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Group Name',
+                          hintText: 'e.g., Roommates, Trip to Italy',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                        ),
+                      ),
+
+                      SizedBox(height: 16.h),
+
+                      // Group Icon
+                      TextField(
+                        controller: iconController,
+                        decoration: InputDecoration(
+                          labelText: 'Icon (Emoji)',
+                          hintText: '👥',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                        ),
+                      ),
+
+                      SizedBox(height: 16.h),
+
+                      // Description (Optional)
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Description (Optional)',
+                          hintText: 'What is this group for?',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                        ),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Select Friends
+                      Text(
+                        'Add Friends',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        'Select friends to add to this group',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+
+                      SizedBox(height: 12.h),
+
+                      if (_friends.isEmpty)
+                        Container(
+                          padding: EdgeInsets.all(16.w),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'No friends yet. Add friends from the Social tab!',
+                              style: TextStyle(color: Colors.grey.shade600),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else
+                        ..._friends.map((friend) {
+                          final friendId = friend['friend_user_id'] as String;
+                          final friendName = friend['full_name'] as String? ?? friend['username'] as String? ?? 'Friend';
+                          final isSelected = selectedFriends.contains(friendId);
+
+                          return LuniGestureDetector(
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  selectedFriends.remove(friendId);
+                                } else {
+                                  selectedFriends.add(friendId);
+                                }
+                              });
+                            },
+                            child: Container(
+                              margin: EdgeInsets.only(bottom: 8.h),
+                              padding: EdgeInsets.all(12.w),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFFD4AF37).withOpacity(0.1)
+                                    : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xFFD4AF37)
+                                      : Colors.grey.shade200,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20.r,
+                                    backgroundImage: friend['avatar_url'] != null
+                                        ? NetworkImage(friend['avatar_url'] as String)
+                                        : null,
+                                    child: friend['avatar_url'] == null
+                                        ? Text(friendName[0].toUpperCase())
+                                        : null,
+                                  ),
+                                  SizedBox(width: 12.w),
+                                  Expanded(
+                                    child: Text(
+                                      friendName,
+                                      style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: Color(0xFFD4AF37),
+                                    )
+                                  else
+                                    Icon(
+                                      Icons.circle_outlined,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+
+                      SizedBox(height: 24.h),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Create Button
+              Container(
+                padding: EdgeInsets.all(24.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: LuniElevatedButton(
+                  onPressed: () async {
+                    if (nameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a group name'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    try {
+                      // Create the group
+                      final groupId = await BackendService.createGroup(
+                        name: nameController.text.trim(),
+                        icon: iconController.text.trim().isNotEmpty
+                            ? iconController.text.trim()
+                            : '👥',
+                        description: descriptionController.text.trim().isNotEmpty
+                            ? descriptionController.text.trim()
+                            : null,
+                      );
+
+                      // Add selected friends to the group
+                      for (final friendId in selectedFriends) {
+                        await BackendService.addGroupMember(
+                          groupId: groupId,
+                          userId: friendId,
+                        );
+                      }
+
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '✅ Group "${nameController.text.trim()}" created with ${selectedFriends.length} members!',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        // Reload groups
+                        _loadSplitQueue();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error creating group: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4AF37),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Create Group${selectedFriends.isEmpty ? '' : ' with ${selectedFriends.length} friend${selectedFriends.length == 1 ? '' : 's'}'}',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
