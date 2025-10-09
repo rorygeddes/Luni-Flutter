@@ -8,6 +8,7 @@ import '../models/conversation_model.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
 import '../utils/haptic_utils.dart';
+import '../widgets/luni_button.dart';
 import 'chat_screen.dart';
 import 'user_search_screen.dart';
 
@@ -246,7 +247,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             child: Row(
               children: [
                 Expanded(
-                  child: GestureDetector(
+                  child: LuniGestureDetector(
                     onTap: () => setState(() => _selectedTab = 0),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 12.h),
@@ -271,7 +272,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                   ),
                 ),
                 Expanded(
-                  child: GestureDetector(
+                  child: LuniGestureDetector(
                     onTap: () => setState(() => _selectedTab = 1),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 12.h),
@@ -296,7 +297,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                   ),
                 ),
                 Expanded(
-                  child: GestureDetector(
+                  child: LuniGestureDetector(
                     onTap: () => setState(() => _selectedTab = 2),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 12.h),
@@ -330,7 +331,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   }
 
   Widget _buildSearchButton() {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: _openSearch,
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
@@ -542,7 +543,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   Widget _buildConversationCard(ConversationModel conversation) {
     final hasUnread = conversation.unreadCount > 0;
     
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: () async {
         // Navigate to chat
         await Navigator.of(context).push(
@@ -704,9 +705,8 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
           Column(
             children: [
               // Accept button
-              GestureDetector(
+              LuniGestureDetector(
                 onTap: () async {
-                  await HapticUtils.mediumImpact();
                   final success = await BackendService.acceptFriendRequest(requesterId);
                   if (mounted) {
                     if (success) {
@@ -743,9 +743,8 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
               ),
               SizedBox(height: 6.h),
               // Reject button
-              GestureDetector(
+              LuniGestureDetector(
                 onTap: () async {
-                  await HapticUtils.lightImpact();
                   final success = await BackendService.rejectFriendRequest(requesterId);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -800,7 +799,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
       child: Row(
         children: [
           // Avatar - Click to view profile
-          GestureDetector(
+          LuniGestureDetector(
             onTap: () => _showPublicProfile(friendUserId, fullName ?? username, avatarUrl),
             child: _buildAvatar(avatarUrl, fullName ?? username),
           ),
@@ -812,7 +811,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () => _showPublicProfile(friendUserId, fullName ?? username, avatarUrl),
                   child: Text(
                     fullName ?? username,
@@ -839,7 +838,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
           ),
           
           // Message button
-          GestureDetector(
+          LuniGestureDetector(
             onTap: () async {
               // Open chat with this friend
               try {
@@ -893,7 +892,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             
             // Content - Click to view profile
             Expanded(
-              child: GestureDetector(
+              child: LuniGestureDetector(
                 onTap: () => _showPublicProfile(user.id, user.fullName ?? user.username ?? 'User', user.avatarUrl),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -925,9 +924,8 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 // Add Friend button
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () async {
-                    await HapticUtils.mediumImpact();
                     // Send friend request
                     try {
                       final success = await BackendService.sendFriendRequest(user.id);
@@ -985,7 +983,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                 ),
                 SizedBox(height: 6.h),
                 // Message button
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () async {
                     // Get or create conversation and navigate to chat
                     try {
