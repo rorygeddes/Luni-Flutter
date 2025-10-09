@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../models/category_model.dart';
+import '../../widgets/luni_button.dart';
 
 class CategoriesSetupScreen extends StatefulWidget {
   const CategoriesSetupScreen({super.key});
@@ -57,11 +62,11 @@ class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
           ),
         ),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          LuniElevatedButton(
             onPressed: () {
               final name = controller.text.trim();
               if (name.isNotEmpty) {
@@ -234,7 +239,7 @@ class _CategoriesSetupScreenState extends State<CategoriesSetupScreen> {
                                     ),
                                   ),
                                   SizedBox(width: 4.w),
-                                  GestureDetector(
+                                  LuniGestureDetector(
                                     onTap: () => _removeCustomSubcategory(parentKey, sub),
                                     child: Icon(
                                       Icons.close,

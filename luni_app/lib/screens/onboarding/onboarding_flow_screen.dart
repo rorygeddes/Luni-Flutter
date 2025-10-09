@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../widgets/luni_button.dart';
 import 'personal_info_screen.dart';
+import '../../widgets/luni_button.dart';
 import 'motivations_screen.dart';
+import '../../widgets/luni_button.dart';
 import 'income_screen.dart';
+import '../../widgets/luni_button.dart';
 import 'expenses_screen.dart';
+import '../../widgets/luni_button.dart';
 import 'frequent_merchants_screen.dart';
+import '../../widgets/luni_button.dart';
 import 'categories_setup_screen.dart';
+import '../../widgets/luni_button.dart';
 import '../main_layout.dart';
+import '../../widgets/luni_button.dart';
 
 class OnboardingFlowScreen extends StatefulWidget {
   const OnboardingFlowScreen({super.key});
@@ -88,7 +99,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
+      body: LuniGestureDetector(
         onTap: () {
           // Dismiss keyboard when tapping outside
           FocusScope.of(context).unfocus();
@@ -181,7 +192,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
                     if (_currentPage > 0) SizedBox(width: 16.w),
                     
                     Expanded(
-                      child: ElevatedButton(
+                      child: LuniElevatedButton(
                         onPressed: _nextPage,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFEAB308),

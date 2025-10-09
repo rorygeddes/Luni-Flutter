@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../widgets/luni_button.dart';
 import '../providers/app_provider.dart';
+import '../widgets/luni_button.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -83,7 +87,7 @@ class HomeScreen extends StatelessWidget {
               SizedBox(height: 24.h),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: LuniElevatedButton(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../widgets/luni_button.dart';
 
 class FrequentMerchantsScreen extends StatefulWidget {
   const FrequentMerchantsScreen({super.key});
@@ -128,7 +132,7 @@ class _FrequentMerchantsScreenState extends State<FrequentMerchantsScreen> {
                     runSpacing: 8.h,
                     children: _commonMerchants.map((merchant) {
                       final isSelected = _selectedMerchants.contains(merchant['name']);
-                      return GestureDetector(
+                      return LuniGestureDetector(
                         onTap: () => _toggleMerchant(merchant['name']),
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -202,7 +206,7 @@ class _FrequentMerchantsScreenState extends State<FrequentMerchantsScreen> {
                         ),
                       ),
                       SizedBox(width: 12.w),
-                      ElevatedButton(
+                      LuniElevatedButton(
                         onPressed: _addCustomMerchant,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFEAB308),
@@ -248,7 +252,7 @@ class _FrequentMerchantsScreenState extends State<FrequentMerchantsScreen> {
                                 ),
                               ),
                               SizedBox(width: 6.w),
-                              GestureDetector(
+                              LuniGestureDetector(
                                 onTap: () => _removeCustomMerchant(merchant),
                                 child: Icon(
                                   Icons.close,

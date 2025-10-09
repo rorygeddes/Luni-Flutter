@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import '../widgets/luni_button.dart';
 import 'auth/sign_in_screen.dart';
 import 'public_profile_preview_screen.dart';
 
@@ -188,7 +189,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back button
-          GestureDetector(
+          LuniGestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: Container(
               width: 40.w,
@@ -216,7 +217,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
           ),
           
           // Profile image button (clickable for settings)
-          GestureDetector(
+          LuniGestureDetector(
             onTap: () => _showSettings(context),
             child: Container(
               width: 40.w,
@@ -408,7 +409,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
                 color: Colors.black,
               ),
             ),
-            GestureDetector(
+            LuniGestureDetector(
               onTap: _isEditing ? _saveProfile : _toggleEdit,
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -570,7 +571,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
   }
 
   Widget _buildActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.all(16.w),
@@ -744,7 +745,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
                       color: Colors.black,
                     ),
                   ),
-                  GestureDetector(
+                  LuniGestureDetector(
                     onTap: () => Navigator.of(context).pop(),
                     child: Container(
                       width: 32.w,
@@ -819,7 +820,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
   }
 
   Widget _buildSettingsItem(String title, IconData icon, bool? value, Function(bool)? onChanged, {VoidCallback? onTap, bool isDestructive = false}) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: onTap,
       child: Container(
         margin: EdgeInsets.only(bottom: 8.h),
@@ -892,7 +893,7 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
         title: const Text('Change Password'),
         content: const Text('Password change functionality will be implemented soon.'),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),
@@ -909,11 +910,11 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
         title: const Text('Delete Account'),
         content: const Text('Are you sure you want to delete your account? This action cannot be undone.'),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          LuniTextButton(
             onPressed: () {
               Navigator.of(context).pop();
               // TODO: Implement account deletion
@@ -944,11 +945,11 @@ class _ProfileViewState extends State<ProfileView> with AutomaticKeepAliveClient
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out? All your data will be saved automatically.'),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Sign Out'),
           ),

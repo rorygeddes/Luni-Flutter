@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import 'package:camera/camera.dart';
+import '../widgets/luni_button.dart';
 
 class AddTransactionView extends StatefulWidget {
   const AddTransactionView({super.key});
@@ -165,7 +168,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
               ),
               SizedBox(height: 24.h),
               // Fallback camera circle for when camera is not available
-              GestureDetector(
+              LuniGestureDetector(
                 onTap: _takePicture,
                 child: Container(
                   width: 80.w,
@@ -208,7 +211,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         
         // Camera circle overlay
         Center(
-          child: GestureDetector(
+          child: LuniGestureDetector(
             onTap: _takePicture,
             child: Container(
               width: 80.w,
@@ -276,7 +279,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
   }
 
   Widget _buildImagePickerButton() {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: _showImagePicker,
       child: Container(
         padding: EdgeInsets.all(12.w),
@@ -314,7 +317,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           // Retake button
-          GestureDetector(
+          LuniGestureDetector(
             onTap: _retakePicture,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
@@ -335,7 +338,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
           ),
           
           // Upload button
-          GestureDetector(
+          LuniGestureDetector(
             onTap: _uploadTransaction,
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
@@ -385,7 +388,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap, {bool isCenter = false}) {
     if (isCenter) {
-      return GestureDetector(
+      return LuniGestureDetector(
         onTap: onTap,
         child: Container(
           width: 48.w,
@@ -407,7 +410,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
       );
     }
 
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -460,7 +463,7 @@ class _AddTransactionViewState extends State<AddTransactionView> {
                     color: Colors.white,
                   ),
                 ),
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () => setState(() => _showPastUploads = false),
                   child: Container(
                     width: 32.w,

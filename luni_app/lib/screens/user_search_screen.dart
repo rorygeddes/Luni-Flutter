@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../services/messaging_service.dart';
+import '../widgets/luni_button.dart';
 import '../services/auth_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/user_model.dart';
+import '../widgets/luni_button.dart';
 import 'user_profile_screen.dart';
+import '../widgets/luni_button.dart';
 
 class UserSearchScreen extends StatefulWidget {
   const UserSearchScreen({super.key});
@@ -204,7 +210,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
   }
 
   Widget _buildUserTile(UserModel user) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: () => _selectUser(user),
       child: Container(
         margin: EdgeInsets.only(bottom: 12.h),

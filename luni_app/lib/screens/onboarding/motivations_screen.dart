@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../providers/onboarding_provider.dart';
+import '../../widgets/luni_button.dart';
 import '../../models/survey_answer_model.dart';
+import '../../widgets/luni_button.dart';
 
 class MotivationsScreen extends StatefulWidget {
   const MotivationsScreen({super.key});
@@ -80,7 +85,7 @@ class _MotivationsScreenState extends State<MotivationsScreen> {
                 
                 return Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
-                  child: GestureDetector(
+                  child: LuniGestureDetector(
                     onTap: isDisabled ? null : () => _toggleMotivation(motivation),
                     child: Container(
                       padding: EdgeInsets.all(16.w),

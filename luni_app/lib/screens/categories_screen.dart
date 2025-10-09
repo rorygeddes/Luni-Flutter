@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../models/category_model.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -286,11 +290,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          LuniElevatedButton(
             onPressed: () async {
               if (parentKeyController.text.isNotEmpty && nameController.text.isNotEmpty) {
                 await BackendService.createCategory(
@@ -342,7 +346,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                 children: [
                   '☕', '🍕', '🍔', '🚗', '🎬', '📚', '💊', '✈️', '🏠', '💰'
                 ].map((emoji) {
-                  return GestureDetector(
+                  return LuniGestureDetector(
                     onTap: () {
                       setDialogState(() {
                         selectedIcon = emoji;
@@ -369,11 +373,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             ],
           ),
           actions: [
-            TextButton(
+            LuniTextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
-            ElevatedButton(
+            LuniElevatedButton(
               onPressed: () async {
                 if (nameController.text.isNotEmpty) {
                   await BackendService.createCategory(
@@ -403,11 +407,11 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         title: const Text('Delete Category?'),
         content: Text('Are you sure you want to delete "${category.name}"?'),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          LuniElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),

@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../services/plaid_service.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/account_model.dart';
+import '../widgets/luni_button.dart';
 import '../models/transaction_model.dart';
+import '../widgets/luni_button.dart';
 import '../models/category_model.dart';
+import '../widgets/luni_button.dart';
 import 'account_detail_screen.dart';
+import '../widgets/luni_button.dart';
 import 'category_detail_screen.dart';
+import '../widgets/luni_button.dart';
 
 class TrackScreen extends StatefulWidget {
   const TrackScreen({super.key});
@@ -248,7 +257,7 @@ class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClient
     // Special styling for "All" account
     final isAllAccount = account.id == 'all_accounts';
     
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -426,7 +435,7 @@ class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClient
                   ),
                 ),
                 if (transaction.category != null)
-                  GestureDetector(
+                  LuniGestureDetector(
                     onTap: () => _showCategoryEditDialog(transaction),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
@@ -446,7 +455,7 @@ class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClient
                     ),
                   )
                 else
-                  GestureDetector(
+                  LuniGestureDetector(
                     onTap: () => _showCategoryEditDialog(transaction),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
@@ -802,11 +811,11 @@ class _TrackScreenState extends State<TrackScreen> with AutomaticKeepAliveClient
             ],
           ),
           actions: [
-            TextButton(
+            LuniTextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text('Cancel'),
             ),
-            ElevatedButton(
+            LuniElevatedButton(
               onPressed: () => _saveCategoryChange(transaction, selectedCategory, selectedSubcategory),
               child: Text('Save'),
             ),

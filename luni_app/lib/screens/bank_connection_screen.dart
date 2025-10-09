@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../services/plaid_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/account_model.dart';
+import '../widgets/luni_button.dart';
 
 class BankConnectionScreen extends StatefulWidget {
   const BankConnectionScreen({super.key});
@@ -197,7 +201,7 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 56.h,
-                child: ElevatedButton(
+                child: LuniElevatedButton(
                   onPressed: _isConnecting ? null : _connectBank,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEAB308),
@@ -417,7 +421,7 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text('OK'),
           ),
@@ -504,7 +508,7 @@ class _BankConnectionScreenState extends State<BankConnectionScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text('OK'),
           ),

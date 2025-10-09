@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/account_model.dart';
 import '../models/transaction_model.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 
 class AccountDetailScreen extends StatefulWidget {
   final AccountModel account;
@@ -60,8 +61,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+        leading: LuniIconButton(
+          icon: Icons.arrow_back,
+          color: Colors.black,
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(

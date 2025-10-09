@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 
 class TransactionQueueScreen extends StatefulWidget {
   const TransactionQueueScreen({Key? key}) : super(key: key);
@@ -187,7 +189,7 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
+          LuniElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD4AF37),
@@ -214,7 +216,7 @@ class _TransactionQueueScreenState extends State<TransactionQueueScreen> {
         ],
       ),
       child: SafeArea(
-        child: ElevatedButton(
+        child: LuniElevatedButton(
           onPressed: _transactions.isEmpty ? null : _submitTransactions,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFD4AF37), // Gold color

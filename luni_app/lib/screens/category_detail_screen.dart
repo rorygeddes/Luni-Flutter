@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../models/category_model.dart';
+import '../widgets/luni_button.dart';
 import '../models/transaction_model.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 
 /// Detail screen showing subcategories and transactions for a parent category
 class CategoryDetailScreen extends StatefulWidget {
@@ -328,7 +333,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     String percentage,
     int transactionCount,
   ) {
-    return GestureDetector(
+    return LuniGestureDetector(
       onTap: () {
         if (transactionCount > 0) {
           _showTransactionsBottomSheet(subcategory);
@@ -595,11 +600,11 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           ],
         ),
         actions: [
-          TextButton(
+          LuniTextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
+          LuniElevatedButton(
             onPressed: () async {
               if (nameController.text.isNotEmpty) {
                 try {

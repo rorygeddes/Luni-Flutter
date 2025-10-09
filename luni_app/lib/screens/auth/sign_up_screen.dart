@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../widgets/luni_button.dart';
 import 'dart:io';
+import '../../widgets/luni_button.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/luni_button.dart';
 import '../../models/user_model.dart';
+import '../../widgets/luni_button.dart';
 import '../onboarding/onboarding_flow_screen.dart';
+import '../../widgets/luni_button.dart';
 import '../main_layout.dart';
+import '../../widgets/luni_button.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -155,7 +163,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   
                   // Profile image picker
                   Center(
-                    child: GestureDetector(
+                    child: LuniGestureDetector(
                       onTap: _pickImage,
                       child: Container(
                         width: 120.w,
@@ -285,7 +293,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56.h,
-                    child: ElevatedButton(
+                    child: LuniElevatedButton(
                       onPressed: _isLoading ? null : _signUp,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEAB308),
@@ -317,7 +325,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   
                   // Sign in link
                   Center(
-                    child: GestureDetector(
+                    child: LuniGestureDetector(
                       onTap: () => Navigator.of(context).pop(),
                       child: RichText(
                         text: TextSpan(

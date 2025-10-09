@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import 'package:provider/provider.dart';
+import '../widgets/luni_button.dart';
 import '../providers/transaction_provider.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/category_model.dart';
+import '../widgets/luni_button.dart';
 import '../models/transaction_model.dart';
+import '../widgets/luni_button.dart';
 
 class AddScreen extends StatefulWidget {
   const AddScreen({super.key});
@@ -585,7 +592,7 @@ class _AddScreenState extends State<AddScreen> with AutomaticKeepAliveClientMixi
       ),
       child: SafeArea(
         top: false,
-        child: ElevatedButton(
+        child: LuniElevatedButton(
           onPressed: _isSubmitting ? null : _submitBatch,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFEAB308),

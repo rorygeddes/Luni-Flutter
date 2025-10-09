@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../widgets/luni_button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../widgets/luni_button.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/luni_button.dart';
 import '../main_layout.dart';
+import '../../widgets/luni_button.dart';
 import 'sign_up_screen.dart';
+import '../../widgets/luni_button.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -190,7 +196,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Forgot password
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(
+                    child: LuniTextButton(
                       onPressed: () {
                         // TODO: Implement forgot password
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -216,7 +222,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: 56.h,
-                    child: ElevatedButton(
+                    child: LuniElevatedButton(
                       onPressed: _isLoading ? null : _signIn,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEAB308),
@@ -304,7 +310,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   
                   // Sign up link
                   Center(
-                    child: GestureDetector(
+                    child: LuniGestureDetector(
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const SignUpScreen(),

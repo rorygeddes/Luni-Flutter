@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/transaction_model.dart';
+import '../widgets/luni_button.dart';
 
 class SplitScreen extends StatefulWidget {
   const SplitScreen({super.key});
@@ -307,7 +311,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
   Widget _buildSplitQueueButton() {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.w),
-      child: ElevatedButton(
+      child: LuniElevatedButton(
         onPressed: _showSplitQueueModal,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFD4AF37),
@@ -979,7 +983,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           // Submit Button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: LuniElevatedButton(
               onPressed: _isSubmitting ? null : _submitSplit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFD4AF37),

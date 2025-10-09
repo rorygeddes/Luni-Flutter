@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 
 class WalletModal extends StatelessWidget {
   const WalletModal({super.key});
@@ -42,7 +44,7 @@ class WalletModal extends StatelessWidget {
                     color: Colors.black,
                   ),
                 ),
-                GestureDetector(
+                LuniGestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
                     width: 32.w,

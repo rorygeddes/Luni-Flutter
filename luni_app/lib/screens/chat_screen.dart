@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../widgets/luni_button.dart';
 import 'package:intl/intl.dart';
+import '../widgets/luni_button.dart';
 import '../services/messaging_service.dart';
+import '../widgets/luni_button.dart';
 import '../services/auth_service.dart';
+import '../widgets/luni_button.dart';
 import '../models/message_model.dart';
+import '../widgets/luni_button.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -402,7 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           SizedBox(width: 12.w),
-          GestureDetector(
+          LuniGestureDetector(
             onTap: _sendMessage,
             child: Container(
               width: 44.w,
