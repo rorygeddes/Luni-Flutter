@@ -21,6 +21,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   List<ConversationModel> _conversations = [];
   List<UserModel> _allUsers = [];
   List<Map<String, dynamic>> _friends = [];
+  List<Map<String, dynamic>> _friendRequests = [];
   bool _isLoading = true;
   bool _hasLoadedOnce = false;
   int _selectedTab = 0; // 0 = Messages, 1 = Friends, 2 = Discover
@@ -41,6 +42,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
       final results = await Future.wait([
         MessagingService.getConversations(),
         BackendService.getFriends(),
+        BackendService.getPendingFriendRequests(),
         MessagingService.getAllUsers(),
       ]);
 
@@ -48,7 +50,8 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
         setState(() {
           _conversations = results[0] as List<ConversationModel>;
           _friends = results[1] as List<Map<String, dynamic>>;
-          _allUsers = results[2] as List<UserModel>;
+          _friendRequests = results[2] as List<Map<String, dynamic>>;
+          _allUsers = results[3] as List<UserModel>;
           _isLoading = false;
           _hasLoadedOnce = true;
         });
@@ -401,7 +404,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   }
 
   Widget _buildFriendsTab() {
-    if (_friends.isEmpty) {
+    if (_friends.isEmpty && _friendRequests.isEmpty) {
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Container(
@@ -439,13 +442,41 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: EdgeInsets.symmetric(horizontal: 24.w),
-      itemCount: _friends.length,
-      itemBuilder: (context, index) {
-        final friend = _friends[index];
-        return _buildFriendCard(friend);
-      },
+      children: [
+        // Friend Requests Section
+        if (_friendRequests.isNotEmpty) ...[
+          SizedBox(height: 8.h),
+          Text(
+            'Friend Requests (${_friendRequests.length})',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ..._friendRequests.map((request) => _buildFriendRequestCard(request)).toList(),
+          SizedBox(height: 24.h),
+          Divider(color: Colors.grey.shade300, thickness: 1),
+          SizedBox(height: 16.h),
+        ],
+        
+        // Friends List Section
+        if (_friends.isNotEmpty) ...[
+          Text(
+            'Friends (${_friends.length})',
+            style: TextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ..._friends.map((friend) => _buildFriendCard(friend)).toList(),
+        ],
+      ],
     );
   }
 
@@ -601,6 +632,128 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFriendRequestCard(Map<String, dynamic> request) {
+    final profile = request['profiles'] as Map<String, dynamic>?;
+    final username = profile?['username'] as String? ?? 'Unknown';
+    final fullName = profile?['full_name'] as String?;
+    final avatarUrl = profile?['avatar_url'] as String?;
+    final requesterId = profile?['id'] as String;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4AF37).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: const Color(0xFFD4AF37), width: 2),
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          _buildAvatar(avatarUrl, fullName ?? username),
+          
+          SizedBox(width: 12.w),
+          
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fullName ?? username,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  'Sent you a friend request',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Action buttons
+          Column(
+            children: [
+              // Accept button
+              GestureDetector(
+                onTap: () async {
+                  final success = await BackendService.acceptFriendRequest(requesterId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success 
+                            ? '✅ Friend request accepted!' 
+                            : '❌ Failed to accept request'),
+                        backgroundColor: success ? Colors.green : Colors.red,
+                      ),
+                    );
+                    if (success) _loadData();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                  child: Text(
+                    'Accept',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 6.h),
+              // Reject button
+              GestureDetector(
+                onTap: () async {
+                  final success = await BackendService.rejectFriendRequest(requesterId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(success 
+                            ? '✅ Friend request rejected' 
+                            : '❌ Failed to reject request'),
+                        backgroundColor: success ? Colors.orange : Colors.red,
+                      ),
+                    );
+                    if (success) _loadData();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                  child: Text(
+                    'Reject',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

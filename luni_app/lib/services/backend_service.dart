@@ -1424,6 +1424,27 @@ class BackendService {
     }
   }
 
+  // Get pending friend requests (requests TO current user)
+  static Future<List<Map<String, dynamic>>> getPendingFriendRequests() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('friends')
+          .select('*, profiles!friends_user_id_fkey(id, username, email, full_name, avatar_url)')
+          .eq('friend_id', user.id)
+          .eq('status', 'pending');
+
+      print('📬 Loaded ${(response as List).length} pending friend requests');
+      return (response as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting friend requests: $e');
+      return [];
+    }
+  }
+
   // Accept friend request
   static Future<bool> acceptFriendRequest(String friendUserId) async {
     try {
@@ -1441,6 +1462,27 @@ class BackendService {
       return true;
     } catch (e) {
       print('❌ Error accepting friend request: $e');
+      return false;
+    }
+  }
+
+  // Reject friend request
+  static Future<bool> rejectFriendRequest(String friendUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      await supabase
+          .from('friends')
+          .delete()
+          .eq('user_id', friendUserId)
+          .eq('friend_id', user.id);
+
+      print('✅ Friend request rejected');
+      return true;
+    } catch (e) {
+      print('❌ Error rejecting friend request: $e');
       return false;
     }
   }
