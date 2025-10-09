@@ -1480,6 +1480,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
                           _selectedGroupId = null;
                           _selectedPeopleIds.clear();
                           _groupMembers.clear();
+                          // Keep _selectedPersonId - user might want to split with just that person
                         });
                       },
                     )
@@ -1501,8 +1502,8 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
               if (value != null) {
                 setState(() {
                   _selectedGroupId = value;
-                  _selectedPersonId = null; // Clear person selection
-                  _selectedPeopleIds.clear();
+                  // Keep person selection if exists - allows splitting with one person in a group context
+                  _selectedPeopleIds.clear(); // Clear only the multi-select, not the direct person
                 });
                 _loadGroupMembers(value);
               }
@@ -1566,11 +1567,8 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
             onChanged: (value) {
               setState(() {
                 _selectedPersonId = value;
-                if (value != null) {
-                  _selectedGroupId = null; // Clear group selection
-                  _selectedPeopleIds.clear();
-                  _groupMembers.clear();
-                }
+                // DON'T clear group - user can have both person AND group selected
+                // This links the split to the group even if splitting with one person
               });
             },
           ),
