@@ -7,6 +7,7 @@ import '../services/backend_service.dart';
 import '../models/conversation_model.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
+import '../utils/haptic_utils.dart';
 import 'chat_screen.dart';
 import 'user_search_screen.dart';
 
@@ -705,8 +706,14 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
               // Accept button
               GestureDetector(
                 onTap: () async {
+                  await HapticUtils.mediumImpact();
                   final success = await BackendService.acceptFriendRequest(requesterId);
                   if (mounted) {
+                    if (success) {
+                      await HapticUtils.success();
+                    } else {
+                      await HapticUtils.error();
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(success 
@@ -738,6 +745,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
               // Reject button
               GestureDetector(
                 onTap: () async {
+                  await HapticUtils.lightImpact();
                   final success = await BackendService.rejectFriendRequest(requesterId);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -919,10 +927,14 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                 // Add Friend button
                 GestureDetector(
                   onTap: () async {
+                    await HapticUtils.mediumImpact();
                     // Send friend request
                     try {
                       final success = await BackendService.sendFriendRequest(user.id);
                       if (mounted) {
+                        if (success) {
+                          await HapticUtils.success();
+                        }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(success 
@@ -937,6 +949,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                         }
                       }
                     } catch (e) {
+                      await HapticUtils.error();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
