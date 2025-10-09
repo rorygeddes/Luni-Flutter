@@ -107,55 +107,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Get conversation preview (last message with each person)
-CREATE OR REPLACE FUNCTION get_conversation_list()
-RETURNS TABLE (
-  other_user_id UUID,
-  username TEXT,
-  profile_image_url TEXT,
-  last_message TEXT,
-  last_message_time TIMESTAMP,
-  unread_count BIGINT
-) AS $$
-BEGIN
-  RETURN QUERY
-  WITH last_messages AS (
-    SELECT 
-      CASE 
-        WHEN sender_id = auth.uid() THEN recipient_id
-        ELSE sender_id
-      END as other_id,
-      content,
-      created_at,
-      ROW_NUMBER() OVER (
-        PARTITION BY CASE WHEN sender_id = auth.uid() THEN recipient_id ELSE sender_id END 
-        ORDER BY created_at DESC
-      ) as rn
-    FROM messages
-    WHERE sender_id = auth.uid() OR recipient_id = auth.uid()
-  ),
-  unread_counts AS (
-    SELECT 
-      sender_id as from_user,
-      COUNT(*) as unread
-    FROM messages
-    WHERE recipient_id = auth.uid() AND is_read = FALSE
-    GROUP BY sender_id
-  )
-  SELECT 
-    lm.other_id,
-    p.username,
-    p.profile_image_url,
-    lm.content as last_message,
-    lm.created_at as last_message_time,
-    COALESCE(uc.unread, 0) as unread_count
-  FROM last_messages lm
-  JOIN profiles p ON p.id = lm.other_id
-  LEFT JOIN unread_counts uc ON uc.from_user = lm.other_id
-  WHERE lm.rn = 1
-  ORDER BY lm.created_at DESC;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Note: Conversation list function moved to messaging system (if needed later)
 
 -- 9. Test the system
 SELECT 'Friends system installed successfully!' as status;
