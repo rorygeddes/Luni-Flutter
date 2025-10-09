@@ -1615,7 +1615,6 @@ class BackendService {
       await supabase.from('group_members').insert({
         'group_id': groupId,
         'user_id': userId,
-        'nickname': nickname,
         'added_by': user.id,
       });
 
