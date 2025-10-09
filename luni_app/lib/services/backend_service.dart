@@ -1241,14 +1241,13 @@ class BackendService {
       final user = supabase.auth.currentUser;
       if (user == null) return 0;
 
-      final count = await supabase
+      final result = await supabase
           .from('transactions')
           .select('id')
           .eq('user_id', user.id)
-          .or('category.is.null,is_categorized.eq.false')
-          .count();
+          .or('category.is.null,is_categorized.eq.false') as List<dynamic>;
 
-      return count;
+      return result.length;
     } catch (e) {
       print('❌ Error getting uncategorized count: $e');
       return 0;
