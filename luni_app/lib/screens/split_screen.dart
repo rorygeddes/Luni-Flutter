@@ -212,23 +212,18 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
   }
 
   Widget _buildPinnedGroupsSection() {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header with "+ Create" button outside
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      child: Row(
         children: [
           Text(
                 'Groups',
             style: TextStyle(
-                  fontSize: 16.sp,
+              fontSize: 18.sp,
               fontWeight: FontWeight.bold,
                 ),
               ),
@@ -249,66 +244,200 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
               ),
             ],
           ),
-          SizedBox(height: 8.h),
-          _groups.isEmpty
-              ? Text('No groups yet', style: TextStyle(color: Colors.grey.shade600))
-              : Wrap(
-                  spacing: 8.w,
-                  runSpacing: 8.h,
+        ),
+
+        // Groups List
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 16.w),
+          child: _groups.isEmpty
+              ? Padding(
+                  padding: EdgeInsets.all(16.w),
+            child: Text(
+                    'No groups yet. Create one to split bills!',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                )
+              : Column(
                   children: _groups.map((group) {
-                    return Chip(
-                      avatar: Text(group['icon'] ?? '👥'),
-                      label: Text(group['name']),
-                      backgroundColor: const Color(0xFFD4AF37).withOpacity(0.1),
-                    );
+                    return _buildGroupCard(group);
                   }).toList(),
+            ),
           ),
         ],
+    );
+  }
+
+  Widget _buildGroupCard(Map<String, dynamic> group) {
+    return LuniGestureDetector(
+      onTap: () => _showGroupDetails(group['id'] as String),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+          color: const Color(0xFFD4AF37), // Gold background
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+        child: Row(
+          children: [
+            // Icon
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                group['icon'] ?? '👥',
+                style: TextStyle(fontSize: 24.sp),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            
+            // Group name and description
+            Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+                  Text(
+                    group['name'] as String,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black, // Black text
+                  ),
+                ),
+                  if (group['description'] != null && (group['description'] as String).isNotEmpty)
+              Text(
+                      group['description'] as String,
+                style: TextStyle(
+                        fontSize: 12.sp,
+                    color: Colors.black87,
+                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+            ),
+
+            // Arrow icon
+            Icon(
+              Icons.chevron_right,
+              color: Colors.black,
+              size: 24.w,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildPinnedPeopleSection() {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16.w),
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Friends',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          _friends.isEmpty
-              ? Text('No friends yet - add friends in Social tab', style: TextStyle(color: Colors.grey.shade600, fontSize: 13.sp))
-              : Wrap(
-                  spacing: 8.w,
-                  runSpacing: 8.h,
-                  children: _friends.map((friend) {
-                    return Chip(
-                      avatar: CircleAvatar(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        child: Text(
-                          (friend['username'] as String?)?.substring(0, 1).toUpperCase() ?? '?',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      label: Text(friend['username'] as String? ?? 'Unknown'),
-                      backgroundColor: Colors.white,
-                    );
-                  }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          child: Text(
+            'People',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ],
           ),
+
+        // People List
+          Container(
+          margin: EdgeInsets.symmetric(horizontal: 16.w),
+          child: _friends.isEmpty
+              ? Padding(
+                  padding: EdgeInsets.all(16.w),
+                  child: Text(
+                    'No friends yet. Add friends in the Social tab!',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                )
+              : Column(
+                  children: _friends.map((friend) {
+                    return _buildPersonCard(friend);
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonCard(Map<String, dynamic> friend) {
+    final friendId = friend['friend_user_id'] as String;
+    final friendName = friend['full_name'] as String? ?? friend['username'] as String? ?? 'Friend';
+    final avatarUrl = friend['avatar_url'] as String?;
+    
+    return LuniGestureDetector(
+      onTap: () => _showPersonDetails(friendId),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+          color: const Color(0xFFD4AF37), // Gold background (same as groups)
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+            ),
+            child: Row(
+              children: [
+            // Avatar
+            CircleAvatar(
+              radius: 24.r,
+              backgroundColor: Colors.black.withOpacity(0.1),
+              backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+              child: avatarUrl == null
+                  ? Text(
+                      friendName[0].toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    )
+                  : null,
+            ),
+            SizedBox(width: 12.w),
+            
+            // Friend name
+                Expanded(
+                  child: Text(
+                friendName,
+                    style: TextStyle(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black, // Black text
+                    ),
+                  ),
+                ),
+
+            // Arrow icon
+            Icon(
+              Icons.chevron_right,
+              color: Colors.black,
+              size: 24.w,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -328,7 +457,7 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
             ),
             child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+            children: [
             const Icon(Icons.receipt_long),
                 SizedBox(width: 8.w),
                 Text(
@@ -898,6 +1027,410 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
         ),
       ),
     );
+  }
+
+  // Show group details modal
+  void _showGroupDetails(String groupId) async {
+    try {
+      final details = await BackendService.getGroupDetails(groupId);
+      final group = details['group'] as Map<String, dynamic>;
+      final members = details['members'] as List<dynamic>;
+      final balances = details['balances'] as Map<String, double>;
+      final transactions = details['transactions'] as List<dynamic>;
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.r),
+              topRight: Radius.circular(20.r),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                width: 40.w,
+                height: 4.h,
+                margin: EdgeInsets.symmetric(vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Row(
+                  children: [
+                    Text(
+                      group['icon'] ?? '👥',
+                      style: TextStyle(fontSize: 32.sp),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            group['name'] as String,
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (group['description'] != null && (group['description'] as String).isNotEmpty)
+                            Text(
+                              group['description'] as String,
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    LuniIconButton(
+                      icon: Icons.close,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 16.h),
+
+              // Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Members section
+                      Text(
+                        'Members',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      ...members.map((member) {
+                        final userId = member['id'] as String;
+                        final name = member['full_name'] as String? ?? member['username'] as String? ?? 'Member';
+                        final balance = balances[userId] ?? 0.0;
+                        final isOwed = balance > 0;
+                        
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8.h),
+                          padding: EdgeInsets.all(12.w),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20.r,
+                                backgroundImage: member['avatar_url'] != null
+                                    ? NetworkImage(member['avatar_url'] as String)
+                                    : null,
+                                child: member['avatar_url'] == null
+                                    ? Text(name[0].toUpperCase())
+                                    : null,
+                              ),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Text(name),
+                              ),
+                              if (balance.abs() > 0.01)
+                                Text(
+                                  '${isOwed ? '+' : '-'}\$${balance.abs().toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isOwed ? Colors.green : Colors.red,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+
+                      SizedBox(height: 24.h),
+
+                      // Transactions section
+                      Text(
+                        'Transactions',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      if (transactions.isEmpty)
+                        Text(
+                          'No transactions yet',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        )
+                      else
+                        ...transactions.map((split) {
+                          final txn = split['transaction'] as Map<String, dynamic>?;
+                          if (txn == null) return const SizedBox.shrink();
+                          
+                          final description = txn['ai_description'] as String? ?? txn['description'] as String? ?? 'Transaction';
+                          final amount = (txn['amount'] as num).toDouble().abs();
+                          final date = DateTime.parse(txn['date'] as String);
+                          
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 8.h),
+                            padding: EdgeInsets.all(12.w),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        description,
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    Text(
+                                      '\$${amount.toStringAsFixed(2)}',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  '${date.day}/${date.month}/${date.year}',
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      print('❌ Error showing group details: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading group details: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Show person details modal
+  void _showPersonDetails(String friendId) async {
+    try {
+      final details = await BackendService.getPersonSplitHistory(friendId);
+      final person = details['person'] as Map<String, dynamic>;
+      final balance = details['balance'] as double;
+      final transactions = details['transactions'] as List<dynamic>;
+
+      final personName = person['full_name'] as String? ?? person['username'] as String? ?? 'Friend';
+      final isOwed = balance > 0;
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.r),
+              topRight: Radius.circular(20.r),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                width: 40.w,
+                height: 4.h,
+                margin: EdgeInsets.symmetric(vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 32.r,
+                      backgroundImage: person['avatar_url'] != null
+                          ? NetworkImage(person['avatar_url'] as String)
+                          : null,
+                      child: person['avatar_url'] == null
+                          ? Text(
+                              personName[0].toUpperCase(),
+                              style: TextStyle(fontSize: 28.sp),
+                            )
+                          : null,
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            personName,
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (balance.abs() > 0.01)
+                            Text(
+                              isOwed
+                                  ? 'Owes you \$${balance.toStringAsFixed(2)}'
+                                  : 'You owe \$${balance.abs().toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: isOwed ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            Text(
+                              'Settled up',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    LuniIconButton(
+                      icon: Icons.close,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 16.h),
+
+              // Transactions section
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Transactions',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      if (transactions.isEmpty)
+                        Text(
+                          'No transactions yet',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        )
+                      else
+                        ...transactions.map((split) {
+                          final txn = split['transaction'] as Map<String, dynamic>?;
+                          if (txn == null) return const SizedBox.shrink();
+                          
+                          final description = txn['ai_description'] as String? ?? txn['description'] as String? ?? 'Transaction';
+                          final amount = (txn['amount'] as num).toDouble().abs();
+                          final date = DateTime.parse(txn['date'] as String);
+                          
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 8.h),
+                            padding: EdgeInsets.all(12.w),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        description,
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    Text(
+                                      '\$${amount.toStringAsFixed(2)}',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  '${date.day}/${date.month}/${date.year}',
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      print('❌ Error showing person details: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading person details: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

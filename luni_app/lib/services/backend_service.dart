@@ -1675,4 +1675,151 @@ class BackendService {
       return false;
     }
   }
+
+  // Get group details with members and balances
+  static Future<Map<String, dynamic>> getGroupDetails(String groupId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get group info
+      final group = await supabase
+          .from('groups')
+          .select('*')
+          .eq('id', groupId)
+          .single();
+
+      // Get all group members with their profile info
+      final members = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', groupId)
+          .cast<List<dynamic>>();
+
+      final memberIds = members.map((m) => m['user_id'] as String).toList();
+      
+      // Get profile info for all members
+      final profiles = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .in_('id', memberIds)
+          .cast<List<dynamic>>();
+
+      // Get all split transactions for this group
+      final splits = await supabase
+          .from('split_transactions')
+          .select('''
+            *,
+            transaction:transactions(id, description, amount, date, ai_description),
+            split_participants(user_id, amount_owed, is_settled)
+          ''')
+          .eq('group_id', groupId)
+          .order('created_at', ascending: false)
+          .cast<List<dynamic>>();
+
+      // Calculate balances for each member
+      final Map<String, double> balances = {};
+      for (final profile in profiles) {
+        balances[profile['id'] as String] = 0.0;
+      }
+
+      // Calculate who owes who
+      for (final split in splits) {
+        final participants = (split['split_participants'] as List<dynamic>?) ?? [];
+        for (final participant in participants) {
+          final userId = participant['user_id'] as String;
+          final amountOwed = (participant['amount_owed'] as num).toDouble();
+          final isSettled = participant['is_settled'] as bool? ?? false;
+          
+          if (!isSettled) {
+            if (userId == user.id) {
+              // You are owed this amount
+              balances[userId] = (balances[userId] ?? 0.0) + amountOwed;
+            } else {
+              // They owe you this amount
+              balances[userId] = (balances[userId] ?? 0.0) - amountOwed;
+            }
+          }
+        }
+      }
+
+      return {
+        'group': group,
+        'members': profiles,
+        'balances': balances,
+        'transactions': splits,
+      };
+    } catch (e) {
+      print('❌ Error getting group details: $e');
+      rethrow;
+    }
+  }
+
+  // Get split history with a specific person
+  static Future<Map<String, dynamic>> getPersonSplitHistory(String otherUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get other user's profile
+      final profile = await supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url')
+          .eq('id', otherUserId)
+          .single();
+
+      // Get all split transactions where both users are participants
+      final splits = await supabase
+          .from('split_transactions')
+          .select('''
+            *,
+            transaction:transactions(id, description, amount, date, ai_description),
+            split_participants!inner(user_id, amount_owed, is_settled)
+          ''')
+          .or('payer_id.eq.${user.id},payer_id.eq.$otherUserId')
+          .order('created_at', ascending: false)
+          .cast<List<dynamic>>();
+
+      // Filter to only splits involving both users
+      final relevantSplits = splits.where((split) {
+        final participants = (split['split_participants'] as List<dynamic>?) ?? [];
+        final userIds = participants.map((p) => p['user_id'] as String).toSet();
+        return userIds.contains(user.id) && userIds.contains(otherUserId);
+      }).toList();
+
+      // Calculate total balance
+      double totalBalance = 0.0;
+      for (final split in relevantSplits) {
+        final payerId = split['payer_id'] as String;
+        final participants = (split['split_participants'] as List<dynamic>?) ?? [];
+        
+        for (final participant in participants) {
+          final userId = participant['user_id'] as String;
+          final amountOwed = (participant['amount_owed'] as num).toDouble();
+          final isSettled = participant['is_settled'] as bool? ?? false;
+          
+          if (!isSettled) {
+            if (payerId == user.id && userId == otherUserId) {
+              // They owe you
+              totalBalance += amountOwed;
+            } else if (payerId == otherUserId && userId == user.id) {
+              // You owe them
+              totalBalance -= amountOwed;
+            }
+          }
+        }
+      }
+
+      return {
+        'person': profile,
+        'balance': totalBalance, // Positive = they owe you, Negative = you owe them
+        'transactions': relevantSplits,
+      };
+    } catch (e) {
+      print('❌ Error getting person split history: $e');
+      rethrow;
+    }
+  }
 }
