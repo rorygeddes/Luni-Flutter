@@ -5,7 +5,7 @@ import 'luni_home_screen.dart';
 import 'track_screen.dart';
 import 'split_screen.dart';
 import 'social_screen.dart';
-import 'add_screen.dart';
+import 'plus_ai_chat_screen.dart';
 import 'profile_view.dart';
 
 class MainLayout extends StatefulWidget {
@@ -73,7 +73,7 @@ class _MainLayoutState extends State<MainLayout> {
                     children: [
                       LuniHomeScreen(),
                       TrackScreen(),
-                      AddScreen(),
+                      PlusAIChatScreen(),
                       SplitScreen(),
                       SocialScreen(),
                     ],
