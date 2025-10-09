@@ -581,19 +581,42 @@ class _SplitQueueCard extends StatefulWidget {
 
 class __SplitQueueCardState extends State<_SplitQueueCard> {
   String? _selectedGroupId;
+  String? _selectedPersonId;
   List<Map<String, dynamic>> _groupMembers = [];
+  List<Map<String, dynamic>> _allFriends = [];
   List<String> _selectedPeopleIds = [];
   bool _isGroupVisible = false;
   bool _isLoadingMembers = false;
+  bool _isLoadingFriends = false;
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
+    _loadFriends();
     // If only one group exists, auto-select it
     if (widget.groups.length == 1) {
       _selectedGroupId = widget.groups.first['id'];
       _loadGroupMembers(_selectedGroupId!);
+    }
+  }
+
+  Future<void> _loadFriends() async {
+    setState(() => _isLoadingFriends = true);
+    
+    try {
+      final friends = await BackendService.getFriends();
+      if (mounted) {
+        setState(() {
+          _allFriends = friends;
+          _isLoadingFriends = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading friends for split: $e');
+      if (mounted) {
+        setState(() => _isLoadingFriends = false);
+      }
     }
   }
 
@@ -616,9 +639,22 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
   }
 
   Future<void> _submitSplit() async {
-    if (_selectedPeopleIds.isEmpty) {
+    // Validate: at least group OR person must be selected
+    if (_selectedGroupId == null && _selectedPersonId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one person to split with')),
+        const SnackBar(content: Text('Please select a group or person to split with')),
+      );
+      return;
+    }
+
+    // If person selected directly, use that; otherwise use group members
+    final participantIds = _selectedPersonId != null 
+        ? [_selectedPersonId!] 
+        : _selectedPeopleIds;
+
+    if (participantIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one person')),
       );
       return;
     }
@@ -627,7 +663,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
 
     final success = await BackendService.submitSplitTransaction(
       transactionId: widget.transaction.id,
-      participantUserIds: _selectedPeopleIds,
+      participantUserIds: participantIds,
       groupId: _selectedGroupId,
       isGroupVisible: _isGroupVisible,
     );
@@ -661,8 +697,13 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
     final description = widget.transaction.aiDescription ?? widget.transaction.description ?? 'Unknown';
     final amount = widget.transaction.amount.abs();
     final date = widget.transaction.date;
-    final amountPerPerson = _selectedPeopleIds.isNotEmpty 
-        ? amount / _selectedPeopleIds.length 
+    
+    // Calculate split count: direct person (1), or group members count
+    final splitCount = _selectedPersonId != null 
+        ? 1 
+        : _selectedPeopleIds.length;
+    final amountPerPerson = splitCount > 0 
+        ? amount / splitCount 
         : amount;
 
     return Container(
@@ -721,13 +762,25 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           ),
           SizedBox(height: 16.h),
 
-          // Group Selection
+          // Group Selection (Optional)
           DropdownButtonFormField<String>(
             value: _selectedGroupId,
             decoration: InputDecoration(
-              labelText: 'Select Group',
+              labelText: 'Select Group (Optional)',
               border: const OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              suffixIcon: _selectedGroupId != null
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _selectedGroupId = null;
+                          _selectedPeopleIds.clear();
+                          _groupMembers.clear();
+                        });
+                      },
+                    )
+                  : null,
             ),
             items: widget.groups.map((group) {
               return DropdownMenuItem<String>(
@@ -745,10 +798,64 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
               if (value != null) {
                 setState(() {
                   _selectedGroupId = value;
+                  _selectedPersonId = null; // Clear person selection
                   _selectedPeopleIds.clear();
                 });
                 _loadGroupMembers(value);
               }
+            },
+          ),
+          SizedBox(height: 12.h),
+
+          // Person Selection (Optional - direct selection without group)
+          DropdownButtonFormField<String>(
+            value: _selectedPersonId,
+            decoration: InputDecoration(
+              labelText: 'Or Select Person Directly (Optional)',
+              border: const OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              suffixIcon: _selectedPersonId != null
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _selectedPersonId = null;
+                        });
+                      },
+                    )
+                  : null,
+            ),
+            items: _allFriends.map((friend) {
+              final friendUserId = friend['friend_user_id'] as String?;
+              final username = friend['username'] as String? ?? 'Unknown';
+              
+              return DropdownMenuItem<String>(
+                value: friendUserId,
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 12.r,
+                      backgroundColor: const Color(0xFFD4AF37),
+                      child: Text(
+                        username.substring(0, 1).toUpperCase(),
+                        style: TextStyle(fontSize: 10.sp, color: Colors.white),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    Text(username),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedPersonId = value;
+                if (value != null) {
+                  _selectedGroupId = null; // Clear group selection
+                  _selectedPeopleIds.clear();
+                  _groupMembers.clear();
+                }
+              });
             },
           ),
           SizedBox(height: 12.h),
@@ -819,30 +926,36 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           ],
 
           // Split Preview
-          if (_selectedPeopleIds.isNotEmpty) ...[
+          if (_selectedPersonId != null || _selectedPeopleIds.isNotEmpty) ...[
             Container(
               padding: EdgeInsets.all(12.w),
               decoration: BoxDecoration(
                 color: const Color(0xFFD4AF37).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Text(
-                    'Amount per person:',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    '\$${amountPerPerson.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFD4AF37),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _selectedPersonId != null 
+                            ? 'Splitting with 1 person:' 
+                            : 'Amount per person (${_selectedPeopleIds.length}):',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '\$${amountPerPerson.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFD4AF37),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

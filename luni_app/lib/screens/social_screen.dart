@@ -592,40 +592,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   }
 
   Widget _buildUserCard(UserModel user) {
-    return GestureDetector(
-      onTap: () async {
-        // Get or create conversation and navigate to chat
-        try {
-          final conversationId = await MessagingService.getOrCreateConversation(user.id);
-          
-          if (mounted) {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  conversationId: conversationId,
-                  otherUserId: user.id,
-                  otherUserName: user.fullName ?? user.username ?? 'User',
-                  otherUserAvatar: user.avatarUrl,
-                ),
-              ),
-            );
-            
-            // Reload data and switch to messages tab
-            await _loadData();
-            setState(() => _selectedTab = 0);
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error starting conversation: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      },
-      child: Container(
+    return Container(
         margin: EdgeInsets.only(bottom: 12.h),
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
@@ -665,21 +632,124 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
               ),
             ),
             
-            // Message button
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEAB308),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Text(
-                'Message',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+            // Action buttons
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Add Friend button
+                GestureDetector(
+                  onTap: () async {
+                    // Send friend request
+                    try {
+                      final success = await BackendService.sendFriendRequest(user.id);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success 
+                                ? '✅ Friend request sent!' 
+                                : '❌ Failed to send friend request'),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                        if (success) {
+                          // Reload data to update friends list
+                          _loadData();
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4AF37),
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_add, size: 14.sp, color: Colors.white),
+                        SizedBox(width: 4.w),
+                        Text(
+                          'Add Friend',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                SizedBox(height: 6.h),
+                // Message button
+                GestureDetector(
+                  onTap: () async {
+                    // Get or create conversation and navigate to chat
+                    try {
+                      final conversationId = await MessagingService.getOrCreateConversation(user.id);
+                      
+                      if (mounted) {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ChatScreen(
+                              conversationId: conversationId,
+                              otherUserId: user.id,
+                              otherUserName: user.fullName ?? user.username ?? 'User',
+                              otherUserAvatar: user.avatarUrl,
+                            ),
+                          ),
+                        );
+                        
+                        // Reload data and switch to messages tab
+                        await _loadData();
+                        setState(() => _selectedTab = 0);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error starting conversation: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(color: const Color(0xFFD4AF37)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.message, size: 14.sp, color: const Color(0xFFD4AF37)),
+                        SizedBox(width: 4.w),
+                        Text(
+                          'Message',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFD4AF37),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
