@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/luni_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/luni_button.dart';
 import '../services/backend_service.dart';
-import '../widgets/luni_button.dart';
 import '../models/transaction_model.dart';
-import '../widgets/luni_button.dart';
 
 class SplitScreen extends StatefulWidget {
   const SplitScreen({super.key});
@@ -114,51 +112,48 @@ class _SplitScreenState extends State<SplitScreen> with AutomaticKeepAliveClient
                         ],
                       ),
                     ),
-                    Divider(height: 1, color: Colors.grey.shade200),
-                    // Split Queue List
-                    Expanded(
-                      child: _splitQueue.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.check_circle, size: 48.sp, color: Colors.grey.shade400),
-                                  SizedBox(height: 12.h),
-                                  Text(
-                                    'No transactions to split',
-                                    style: TextStyle(fontSize: 16.sp, color: Colors.grey.shade600),
-                                  ),
-                                  SizedBox(height: 12.h),
-                                  LuniTextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Close'),
-                                  ),
-                                ],
+                Divider(height: 1, color: Colors.grey.shade200),
+                // Split Queue - ONE AT A TIME (like transaction queue)
+                Expanded(
+                  child: _splitQueue.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle, size: 48.sp, color: Colors.grey.shade400),
+                              SizedBox(height: 12.h),
+                              Text(
+                                'No transactions to split',
+                                style: TextStyle(fontSize: 16.sp, color: Colors.grey.shade600),
                               ),
-                            )
-                          : ListView.builder(
-                              controller: scrollController,
-                              padding: EdgeInsets.all(16.w),
-                              itemCount: _splitQueue.length,
-                              itemBuilder: (context, index) {
-                                return _SplitQueueCard(
-                                  transaction: _splitQueue[index],
-                                  groups: _groups,
-                                  onSplitSubmitted: () async {
-                                    // Reload queue and update modal state
-                                    await _loadSplitQueue();
-                                    setModalState(() {});
-                                    setState(() {}); // Update parent state too
-                                    
-                                    // Close modal if queue is now empty
-                                    if (_splitQueue.isEmpty) {
-                                      Navigator.pop(context);
-                                    }
-                                  },
-                                );
-                              },
-                            ),
-                    ),
+                              SizedBox(height: 12.h),
+                              LuniTextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          controller: scrollController,
+                          padding: EdgeInsets.all(16.w),
+                          child: _SplitQueueCard(
+                            transaction: _splitQueue.first, // Show ONLY the first transaction
+                            groups: _groups,
+                            onSplitSubmitted: () async {
+                              // Reload queue and update modal state
+                              await _loadSplitQueue();
+                              setModalState(() {});
+                              setState(() {}); // Update parent state too
+                              
+                              // Close modal if queue is now empty
+                              if (_splitQueue.isEmpty) {
+                                Navigator.pop(context);
+                              }
+                            },
+                          ),
+                        ),
+                ),
                   ],
                 ),
               );
@@ -1328,7 +1323,15 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
       if (mounted) {
         setState(() {
           _groupMembers = members;
+          // Auto-select all group members (excluding current user who is the payer)
+          final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+          _selectedPeopleIds = members
+              .where((m) => m['id'] != currentUserId) // Exclude payer
+              .map((m) => m['id'] as String)
+              .toList();
           _isLoadingMembers = false;
+          
+          print('✅ Auto-selected ${_selectedPeopleIds.length} group members for split');
         });
       }
     } catch (e) {
@@ -1375,7 +1378,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '✅ Split \$${widget.transaction.amount.abs().toStringAsFixed(2)} among ${_selectedPeopleIds.length} people',
+              '✅ Split \$${widget.transaction.amount.abs().toStringAsFixed(2)} among ${participantIds.length} people',
             ),
             backgroundColor: Colors.green,
           ),
