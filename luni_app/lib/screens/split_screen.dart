@@ -1284,6 +1284,10 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
   bool _isLoadingMembers = false;
   bool _isLoadingFriends = false;
   bool _isSubmitting = false;
+  
+  // Quick group creation
+  List<String?> _quickGroupPeople = [null]; // Start with one person slot
+  final TextEditingController _groupNameController = TextEditingController();
 
   @override
   void initState() {
@@ -1294,6 +1298,12 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
       _selectedGroupId = widget.groups.first['id'];
       _loadGroupMembers(_selectedGroupId!);
     }
+  }
+  
+  @override
+  void dispose() {
+    _groupNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFriends() async {
@@ -1342,52 +1352,117 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
   }
 
   Future<void> _submitSplit() async {
-    // Validate: at least group OR person must be selected
-    if (_selectedGroupId == null && _selectedPersonId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a group or person to split with')),
-      );
-      return;
-    }
-
-    // If person selected directly, use that; otherwise use group members
-    final participantIds = _selectedPersonId != null 
-        ? [_selectedPersonId!] 
-        : _selectedPeopleIds;
-
-    if (participantIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one person')),
-      );
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
-    final success = await BackendService.submitSplitTransaction(
-      transactionId: widget.transaction.id,
-      participantUserIds: participantIds,
-      groupId: _selectedGroupId,
-      isGroupVisible: _isGroupVisible,
-    );
-
-    if (mounted) {
-      setState(() => _isSubmitting = false);
+    try {
+      String? groupIdToUse = _selectedGroupId;
+      List<String> participantIds = [];
       
-      if (success) {
+      // QUICK GROUP CREATION: If using quick group people (no group selected)
+      if (_selectedGroupId == null) {
+        final selectedPeople = _quickGroupPeople.where((p) => p != null).cast<String>().toList();
+        
+        if (selectedPeople.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select at least one person')),
+          );
+          setState(() => _isSubmitting = false);
+          return;
+        }
+        
+        // If 2+ people, create a group
+        if (selectedPeople.length >= 2) {
+          if (_groupNameController.text.trim().isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please enter a group name for 2+ people')),
+            );
+            setState(() => _isSubmitting = false);
+            return;
+          }
+          
+          // Create the group
+          print('🔨 Creating quick group: ${_groupNameController.text}');
+          final newGroupId = await BackendService.createGroup(
+            name: _groupNameController.text.trim(),
+            icon: '👥',
+          );
+          
+          if (newGroupId == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to create group'), backgroundColor: Colors.red),
+              );
+            }
+            setState(() => _isSubmitting = false);
+            return;
+          }
+          
+          // Add all selected people to the group
+          for (final personId in selectedPeople) {
+            await BackendService.addGroupMember(
+              groupId: newGroupId,
+              userId: personId,
+            );
+          }
+          
+          print('✅ Quick group created with ${selectedPeople.length} members');
+          groupIdToUse = newGroupId;
+          participantIds = selectedPeople;
+        } else {
+          // Just 1 person selected
+          participantIds = selectedPeople;
+        }
+      } else {
+        // Using existing group - use group members
+        participantIds = _selectedPeopleIds;
+      }
+
+      // Validate we have participants
+      if (participantIds.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one person')),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      // Submit the split
+      final success = await BackendService.submitSplitTransaction(
+        transactionId: widget.transaction.id,
+        participantUserIds: participantIds,
+        groupId: groupIdToUse,
+        isGroupVisible: _isGroupVisible,
+      );
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '✅ Split \$${widget.transaction.amount.abs().toStringAsFixed(2)} among ${participantIds.length} people${groupIdToUse != null ? ' (Group created!)' : ''}',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+          widget.onSplitSubmitted();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Error creating split'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error in _submitSplit: $e');
+      if (mounted) {
+        setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '✅ Split \$${widget.transaction.amount.abs().toStringAsFixed(2)} among ${participantIds.length} people',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-        widget.onSplitSubmitted();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Error creating split'),
+            content: Text('Error: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1401,10 +1476,10 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
     final amount = widget.transaction.amount.abs();
     final date = widget.transaction.date;
     
-    // Calculate split count: direct person (1), or group members count
-    final splitCount = _selectedPersonId != null 
-        ? 1 
-        : _selectedPeopleIds.length;
+    // Calculate split count based on mode
+    final splitCount = _selectedGroupId != null
+        ? _selectedPeopleIds.length // Using existing group
+        : _quickGroupPeople.where((p) => p != null).length; // Using quick group
     final amountPerPerson = splitCount > 0 
         ? amount / splitCount 
         : amount;
@@ -1511,68 +1586,96 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           ),
           SizedBox(height: 12.h),
 
-          // Person Selection (Optional - direct selection without group)
-          DropdownButtonFormField<String>(
-            value: _selectedPersonId,
-            decoration: InputDecoration(
-              labelText: 'Or Select Person Directly (Optional)',
-              border: const OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              suffixIcon: _selectedPersonId != null
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _selectedPersonId = null;
-                        });
-                      },
-                    )
-                  : null,
+          // Quick Group Creation (when no group selected)
+          if (_selectedGroupId == null) ...[
+              Text(
+              'Or Split with Person(s):',
+                style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
             ),
-            items: () {
-              // Remove duplicates based on friend_user_id
-              final seenIds = <String>{};
-              final uniqueFriends = <DropdownMenuItem<String>>[];
+            SizedBox(height: 8.h),
+            
+            // Dynamic person selection fields
+            ..._quickGroupPeople.asMap().entries.map((entry) {
+              final index = entry.key;
+              final personId = entry.value;
               
-              for (final friend in _allFriends) {
-                final friendUserId = friend['friend_user_id'] as String?;
-                if (friendUserId == null || seenIds.contains(friendUserId)) continue;
-                
-                seenIds.add(friendUserId);
-                final username = friend['username'] as String? ?? 'Unknown';
-                
-                uniqueFriends.add(
-                  DropdownMenuItem<String>(
-                    value: friendUserId,
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 12.r,
-                          backgroundColor: const Color(0xFFD4AF37),
-                          child: Text(
-                            username.isNotEmpty ? username.substring(0, 1).toUpperCase() : '?',
-                            style: TextStyle(fontSize: 10.sp, color: Colors.white),
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        Text(username),
-                      ],
-                    ),
+              return Padding(
+                padding: EdgeInsets.only(bottom: 8.h),
+                child: DropdownButtonFormField<String>(
+                  value: personId,
+                  decoration: InputDecoration(
+                    labelText: 'Person ${index + 1}',
+                    border: const OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    suffixIcon: index > 0
+                        ? IconButton(
+                            icon: const Icon(Icons.remove_circle, size: 20, color: Colors.red),
+                            onPressed: () {
+                              setState(() {
+                                _quickGroupPeople.removeAt(index);
+                              });
+                            },
+                          )
+                        : null,
                   ),
-                );
-              }
-              
-              return uniqueFriends;
-            }(),
-            onChanged: (value) {
-              setState(() {
-                _selectedPersonId = value;
-                // DON'T clear group - user can have both person AND group selected
-                // This links the split to the group even if splitting with one person
-              });
-            },
-          ),
-          SizedBox(height: 12.h),
+                  items: _allFriends.where((friend) {
+                    final friendId = friend['friend_user_id'] as String?;
+                    // Don't show already selected people
+                    return friendId != null && !_quickGroupPeople.contains(friendId);
+                  }).map((friend) {
+                    final friendId = friend['friend_user_id'] as String;
+                    final username = friend['username'] as String? ?? 'Unknown';
+                    
+                    return DropdownMenuItem<String>(
+                      value: friendId,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 12.r,
+                            backgroundColor: const Color(0xFFD4AF37),
+                            child: Text(
+                              username.isNotEmpty ? username.substring(0, 1).toUpperCase() : '?',
+                              style: TextStyle(fontSize: 10.sp, color: Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(username),
+        ],
+      ),
+    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _quickGroupPeople[index] = value;
+                      // If this is the last field and it's filled, add a new field
+                      if (index == _quickGroupPeople.length - 1 && value != null) {
+                        _quickGroupPeople.add(null);
+                      }
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+            
+            // Group name field (only if 2+ people selected)
+            if (_quickGroupPeople.where((p) => p != null).length >= 2) ...[
+              SizedBox(height: 8.h),
+              TextField(
+                controller: _groupNameController,
+                decoration: InputDecoration(
+                  labelText: 'Group Name (Required for 2+ people)',
+                  border: const OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  prefixIcon: const Icon(Icons.group, color: Color(0xFFD4AF37)),
+                ),
+              ),
+            ],
+            SizedBox(height: 12.h),
+          ],
 
           // Members Selection
           if (_selectedGroupId != null) ...[
@@ -1627,7 +1730,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
           ],
 
           // Split Preview
-          if (_selectedPersonId != null || _selectedPeopleIds.isNotEmpty) ...[
+          if (splitCount > 0) ...[
             Container(
               padding: EdgeInsets.all(12.w),
               decoration: BoxDecoration(
@@ -1641,9 +1744,7 @@ class __SplitQueueCardState extends State<_SplitQueueCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          _selectedPersonId != null 
-                              ? 'Splitting with 1 person:' 
-                              : 'Amount per person (${_selectedPeopleIds.length}):',
+                          'Amount per person ($splitCount):',
                           style: TextStyle(
                             fontSize: 14.sp,
                             fontWeight: FontWeight.w500,
