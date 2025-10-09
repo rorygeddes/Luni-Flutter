@@ -19,12 +19,17 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   bool _isLoading = false;
   bool _hasLoadedContext = false;
   Map<String, dynamic>? _financialContext;
+  
+  // Chat history
+  String? _currentConversationId;
+  List<Map<String, dynamic>> _conversations = [];
+  bool _showSidebar = false;
 
   @override
   void initState() {
     super.initState();
     _loadFinancialContext();
-    _addWelcomeMessage();
+    _initializeChat();
   }
 
   @override
@@ -91,18 +96,88 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     }
   }
 
-  void _addWelcomeMessage() {
-    setState(() {
-      _messages.add(ChatMessage(
-        text: 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?',
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
-    });
+  Future<void> _initializeChat() async {
+    // Load all conversations
+    final conversations = await BackendService.getAIConversations();
+    
+    if (mounted) {
+      setState(() {
+        _conversations = conversations;
+      });
+
+      // If there are existing conversations, load the most recent one
+      if (conversations.isNotEmpty) {
+        await _loadConversation(conversations.first['id'] as String);
+      } else {
+        // Create a new conversation
+        await _createNewChat();
+      }
+    }
+  }
+
+  Future<void> _createNewChat() async {
+    final conversationId = await BackendService.createAIConversation();
+    
+    if (conversationId != null && mounted) {
+      setState(() {
+        _currentConversationId = conversationId;
+        _messages.clear();
+      });
+
+      // Add welcome message and save it
+      final welcomeText = 'Hey! 👋 I\'m Luni, your personal finance assistant. I can help you understand your spending, create budgets, and answer any money questions you have!\n\nWhat would you like to know?';
+      
+      setState(() {
+        _messages.add(ChatMessage(
+          text: welcomeText,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      });
+
+      // Save welcome message to database
+      await BackendService.saveAIMessage(
+        conversationId: conversationId,
+        role: 'assistant',
+        content: welcomeText,
+      );
+
+      // Reload conversations list
+      await _reloadConversations();
+    }
+  }
+
+  Future<void> _loadConversation(String conversationId) async {
+    final messages = await BackendService.getAIMessages(conversationId);
+    
+    if (mounted) {
+      setState(() {
+        _currentConversationId = conversationId;
+        _messages.clear();
+        for (var msg in messages) {
+          _messages.add(ChatMessage(
+            text: msg['content'] as String,
+            isUser: msg['role'] == 'user',
+            timestamp: DateTime.parse(msg['created_at'] as String),
+          ));
+        }
+      });
+
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _reloadConversations() async {
+    final conversations = await BackendService.getAIConversations();
+    if (mounted) {
+      setState(() {
+        _conversations = conversations;
+      });
+    }
   }
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty || _isLoading) return;
+    if (text.trim().isEmpty || _isLoading || _currentConversationId == null) return;
 
     final userMessage = text.trim();
     _messageController.clear();
@@ -118,6 +193,25 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     });
 
     _scrollToBottom();
+
+    // Save user message to database
+    await BackendService.saveAIMessage(
+      conversationId: _currentConversationId!,
+      role: 'user',
+      content: userMessage,
+    );
+
+    // Auto-generate title from first user message
+    if (_messages.where((m) => m.isUser).length == 1) {
+      final title = userMessage.length > 50 
+          ? '${userMessage.substring(0, 50)}...' 
+          : userMessage;
+      await BackendService.updateAIConversationTitle(
+        conversationId: _currentConversationId!,
+        title: title,
+      );
+      await _reloadConversations();
+    }
 
     try {
       // Build conversation history (last 10 messages for context)
@@ -147,6 +241,13 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         ));
         _isLoading = false;
       });
+
+      // Save AI response to database
+      await BackendService.saveAIMessage(
+        conversationId: _currentConversationId!,
+        role: 'assistant',
+        content: aiResponse,
+      );
 
       _scrollToBottom();
     } catch (e) {
@@ -179,24 +280,32 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Header
-            _buildHeader(),
-            
-            // Messages
-            Expanded(
-              child: _messages.isEmpty
-                  ? _buildEmptyState()
-                  : _buildMessageList(),
+            // Main content
+            Column(
+              children: [
+                // Header
+                _buildHeader(),
+                
+                // Messages
+                Expanded(
+                  child: _messages.isEmpty
+                      ? _buildEmptyState()
+                      : _buildMessageList(),
+                ),
+                
+                // Suggested questions (only show at start)
+                if (_messages.length <= 1 && _hasLoadedContext)
+                  _buildSuggestedQuestions(),
+                
+                // Input field
+                _buildInputField(),
+              ],
             ),
             
-            // Suggested questions (only show at start)
-            if (_messages.length <= 1 && _hasLoadedContext)
-              _buildSuggestedQuestions(),
-            
-            // Input field
-            _buildInputField(),
+            // Sidebar overlay
+            if (_showSidebar) _buildSidebar(),
           ],
         ),
       ),
@@ -219,12 +328,12 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
       child: Row(
         children: [
           LuniIconButton(
-            icon: Icons.arrow_back,
-            onPressed: () => Navigator.pop(context),
+            icon: Icons.menu,
+            onPressed: () => setState(() => _showSidebar = !_showSidebar),
             color: Colors.black87,
             size: 24.w,
           ),
-          SizedBox(width: 16.w),
+          SizedBox(width: 12.w),
           Container(
             width: 40.w,
             height: 40.w,
@@ -243,38 +352,46 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
             ),
           ),
           SizedBox(width: 12.w),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Luni AI',
-                style: TextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Luni AI',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 8.w,
-                    height: 8.w,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
+                Row(
+                  children: [
+                    Container(
+                      width: 8.w,
+                      height: 8.w,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    'Online',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: Colors.grey.shade600,
+                    SizedBox(width: 6.w),
+                    Text(
+                      'Online',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          LuniIconButton(
+            icon: Icons.close,
+            onPressed: () => Navigator.pop(context),
+            color: Colors.black87,
+            size: 24.w,
           ),
         ],
       ),
@@ -618,6 +735,163 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSidebar() {
+    return LuniGestureDetector(
+      onTap: () => setState(() => _showSidebar = false),
+      child: Container(
+        color: Colors.black.withOpacity(0.5),
+        child: Row(
+          children: [
+            LuniGestureDetector(
+              onTap: () {}, // Prevent tap-through
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.75,
+                color: Colors.white,
+                child: Column(
+                  children: [
+                    // Sidebar header
+                    Container(
+                      padding: EdgeInsets.all(20.w),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEAB308), Color(0xFFD4AF37)],
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Chat History',
+                            style: TextStyle(
+                              fontSize: 20.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Spacer(),
+                          LuniIconButton(
+                            icon: Icons.add,
+                            onPressed: () {
+                              _createNewChat();
+                              setState(() => _showSidebar = false);
+                            },
+                            color: Colors.white,
+                            size: 24.w,
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Conversations list
+                    Expanded(
+                      child: _conversations.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No conversations yet',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: EdgeInsets.symmetric(vertical: 8.h),
+                              itemCount: _conversations.length,
+                              itemBuilder: (context, index) {
+                                final conversation = _conversations[index];
+                                final isActive = conversation['id'] == _currentConversationId;
+                                
+                                return LuniGestureDetector(
+                                  onTap: () {
+                                    _loadConversation(conversation['id'] as String);
+                                    setState(() => _showSidebar = false);
+                                  },
+                                  child: Container(
+                                    margin: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                    padding: EdgeInsets.all(12.w),
+                                    decoration: BoxDecoration(
+                                      color: isActive ? const Color(0xFFEAB308).withOpacity(0.1) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8.r),
+                                      border: Border.all(
+                                        color: isActive ? const Color(0xFFEAB308) : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.chat_bubble_outline,
+                                          size: 20.w,
+                                          color: isActive ? const Color(0xFFEAB308) : Colors.grey.shade600,
+                                        ),
+                                        SizedBox(width: 12.w),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                conversation['title'] as String,
+                                                style: TextStyle(
+                                                  fontSize: 14.sp,
+                                                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                                                  color: Colors.black87,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              Text(
+                                                _formatDate(DateTime.parse(conversation['updated_at'] as String)),
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (!isActive)
+                                          LuniIconButton(
+                                            icon: Icons.delete_outline,
+                                            onPressed: () async {
+                                              await BackendService.deleteAIConversation(conversation['id'] as String);
+                                              await _reloadConversations();
+                                            },
+                                            color: Colors.red,
+                                            size: 20.w,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    
+    if (diff.inDays == 0) {
+      return 'Today';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} days ago';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
   }
 }
 

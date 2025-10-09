@@ -1848,4 +1848,135 @@ class BackendService {
       rethrow;
     }
   }
+
+  // ============================================================================
+  // AI CHAT HISTORY METHODS
+  // ============================================================================
+
+  // Create a new AI conversation
+  static Future<String?> createAIConversation({String title = 'New Chat'}) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('ai_conversations')
+          .insert({
+            'user_id': user.id,
+            'title': title,
+          })
+          .select()
+          .single();
+
+      final conversationId = response['id'] as String;
+      print('✅ Created AI conversation: $conversationId');
+      return conversationId;
+    } catch (e) {
+      print('❌ Error creating AI conversation: $e');
+      return null;
+    }
+  }
+
+  // Get all user's AI conversations
+  static Future<List<Map<String, dynamic>>> getAIConversations() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final response = await supabase
+          .from('ai_conversations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', ascending: false) as List<dynamic>;
+
+      print('📋 Loaded ${response.length} AI conversations');
+      return response.cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting AI conversations: $e');
+      return [];
+    }
+  }
+
+  // Save a message to a conversation
+  static Future<bool> saveAIMessage({
+    required String conversationId,
+    required String role,
+    required String content,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      await supabase.from('ai_messages').insert({
+        'conversation_id': conversationId,
+        'role': role,
+        'content': content,
+      });
+
+      print('💬 Saved $role message to conversation $conversationId');
+      return true;
+    } catch (e) {
+      print('❌ Error saving AI message: $e');
+      return false;
+    }
+  }
+
+  // Get all messages in a conversation
+  static Future<List<Map<String, dynamic>>> getAIMessages(String conversationId) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      final response = await supabase
+          .from('ai_messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .order('created_at', ascending: true) as List<dynamic>;
+
+      print('📨 Loaded ${response.length} messages from conversation $conversationId');
+      return response.cast<Map<String, dynamic>>();
+    } catch (e) {
+      print('❌ Error getting AI messages: $e');
+      return [];
+    }
+  }
+
+  // Update conversation title
+  static Future<bool> updateAIConversationTitle({
+    required String conversationId,
+    required String title,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      await supabase
+          .from('ai_conversations')
+          .update({'title': title})
+          .eq('id', conversationId);
+
+      print('✏️  Updated conversation title: $title');
+      return true;
+    } catch (e) {
+      print('❌ Error updating conversation title: $e');
+      return false;
+    }
+  }
+
+  // Delete a conversation (and all its messages via CASCADE)
+  static Future<bool> deleteAIConversation(String conversationId) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      await supabase
+          .from('ai_conversations')
+          .delete()
+          .eq('id', conversationId);
+
+      print('🗑️  Deleted conversation $conversationId');
+      return true;
+    } catch (e) {
+      print('❌ Error deleting conversation: $e');
+      return false;
+    }
+  }
 }
