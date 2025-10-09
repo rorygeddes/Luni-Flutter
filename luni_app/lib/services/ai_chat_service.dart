@@ -485,9 +485,13 @@ Communication style:
           final endDate = DateTime.parse(arguments['end_date']);
 
           final filtered = transactions.where((t) {
-            final date = DateTime.parse(t['date']);
-            return date.isAfter(startDate.subtract(const Duration(days: 1))) && 
-                   date.isBefore(endDate.add(const Duration(days: 1)));
+            try {
+              final date = DateTime.parse(t['date'] as String);
+              return date.isAfter(startDate.subtract(const Duration(days: 1))) && 
+                     date.isBefore(endDate.add(const Duration(days: 1)));
+            } catch (e) {
+              return false;
+            }
           }).toList();
 
           // Filter by category if provided
@@ -498,16 +502,19 @@ Communication style:
                 category.toLowerCase());
           }
 
-          final total = filtered.fold(0.0, (sum, t) => sum + (t['amount'] as num).toDouble().abs());
+          final total = filtered.fold(0.0, (sum, t) {
+            final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+            return sum + amount.abs();
+          });
 
           return {
             'count': filtered.length,
             'total_amount': total,
             'transactions': filtered.take(20).map((t) => {
-                  'description': t['ai_description'] ?? t['description'],
-                  'amount': t['amount'],
-                  'category': t['category'],
-                  'date': t['date'],
+                  'description': t['ai_description'] ?? t['description'] ?? 'Unknown',
+                  'amount': (t['amount'] as num?)?.toDouble() ?? 0.0,
+                  'category': t['category'] ?? 'Uncategorized',
+                  'date': t['date'] ?? '',
                 }).toList(),
           };
 
@@ -519,15 +526,20 @@ Communication style:
           final categoryTotals = <String, double>{};
 
           for (var t in transactions) {
-            final date = DateTime.parse(t['date']);
-            if (date.isAfter(startDate.subtract(const Duration(days: 1))) &&
-                date.isBefore(endDate.add(const Duration(days: 1)))) {
-              final category = t['category'] as String? ?? 'Uncategorized';
-              final amount = (t['amount'] as num).toDouble();
-              if (amount < 0) {
-                categoryTotals[category] =
-                    (categoryTotals[category] ?? 0) + amount.abs();
+            try {
+              final date = DateTime.parse(t['date'] as String);
+              if (date.isAfter(startDate.subtract(const Duration(days: 1))) &&
+                  date.isBefore(endDate.add(const Duration(days: 1)))) {
+                final category = t['category'] as String? ?? 'Uncategorized';
+                final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+                if (amount < 0) {
+                  categoryTotals[category] =
+                      (categoryTotals[category] ?? 0) + amount.abs();
+                }
               }
+            } catch (e) {
+              // Skip transactions with invalid dates
+              continue;
             }
           }
 
@@ -546,16 +558,27 @@ Communication style:
 
         case 'get_account_balances':
           final accounts = await BackendService.getAccounts();
+          
+          double totalBalance = 0.0;
+          final accountList = <Map<String, dynamic>>[];
+          
+          for (var account in accounts) {
+            final balance = (account['current_balance'] as num?)?.toDouble() ?? 0.0;
+            final name = account['name'] as String? ?? 'Unknown Account';
+            final type = account['type'] as String? ?? 'Unknown Type';
+            
+            accountList.add({
+              'name': name,
+              'balance': balance,
+              'type': type,
+            });
+            
+            totalBalance += balance;
+          }
+          
           return {
-            'accounts': accounts
-                .map((a) => {
-                      'name': a['name'],
-                      'balance': a['current_balance'],
-                      'type': a['type'],
-                    })
-                .toList(),
-            'total_balance': accounts.fold(
-                0.0, (sum, a) => sum + (a['current_balance'] as num).toDouble()),
+            'accounts': accountList,
+            'total_balance': totalBalance,
           };
 
         case 'find_transactions':
@@ -563,8 +586,12 @@ Communication style:
           final transactions = await BackendService.getTransactions(limit: 500);
 
           final matches = transactions.where((t) {
-            final desc = (t['ai_description'] ?? t['description']) as String;
-            return desc.toLowerCase().contains(keyword.toLowerCase());
+            try {
+              final desc = ((t['ai_description'] ?? t['description']) as String?) ?? '';
+              return desc.toLowerCase().contains(keyword.toLowerCase());
+            } catch (e) {
+              return false;
+            }
           }).toList();
 
           return {
@@ -572,10 +599,10 @@ Communication style:
             'transactions': matches
                 .take(10)
                 .map((t) => {
-                      'description': t['ai_description'] ?? t['description'],
-                      'amount': t['amount'],
-                      'category': t['category'],
-                      'date': t['date'],
+                      'description': t['ai_description'] ?? t['description'] ?? 'Unknown',
+                      'amount': (t['amount'] as num?)?.toDouble() ?? 0.0,
+                      'category': t['category'] ?? 'Uncategorized',
+                      'date': t['date'] ?? '',
                     })
                 .toList(),
           };
