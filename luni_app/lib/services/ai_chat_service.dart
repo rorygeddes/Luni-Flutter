@@ -443,7 +443,7 @@ Communication style:
         'type': 'function',
         'function': {
           'name': 'get_account_balances',
-          'description': 'Get current balance of all user accounts. Use when user asks about their balance, how much money they have, or account status.',
+          'description': 'Get current balance of all user accounts with dynamic calculation. Returns account names, types, balances (in CAD), and total balance. Use when user asks about their balance, how much money they have, net worth, or account status. Balances are automatically converted to CAD.',
           'parameters': {
             'type': 'object',
             'properties': {},
@@ -563,22 +563,28 @@ Communication style:
           final accountList = <Map<String, dynamic>>[];
           
           for (var account in accounts) {
-            final balance = (account['current_balance'] as num?)?.toDouble() ?? 0.0;
+            // BackendService.getAccounts() returns 'balance' field (not 'current_balance')
+            final balance = (account['balance'] as num?)?.toDouble() ?? 0.0;
             final name = account['name'] as String? ?? 'Unknown Account';
             final type = account['type'] as String? ?? 'Unknown Type';
+            final currency = account['display_currency'] as String? ?? 'CAD';
             
             accountList.add({
               'name': name,
               'balance': balance,
               'type': type,
+              'currency': currency,
             });
             
             totalBalance += balance;
           }
           
+          print('✅ Agent tool: Found ${accountList.length} accounts, total: \$${totalBalance.toStringAsFixed(2)}');
+          
           return {
             'accounts': accountList,
             'total_balance': totalBalance,
+            'currency': 'CAD',
           };
 
         case 'find_transactions':
