@@ -21,6 +21,12 @@ Could not find the function public.get_user_friends
 docs/sql/ADD_SPLIT_SYSTEM_SAFE.sql
 ```
 
+**Then run this fix for RLS policies:**
+```sql
+docs/sql/FIX_SPLIT_RLS_POLICIES.sql
+```
+(Fixes infinite recursion error in split_transactions)
+
 ## 3. Duplicate Detection (if not already run)
 ```sql
 -- Run this for Transaction Queue duplicate detection

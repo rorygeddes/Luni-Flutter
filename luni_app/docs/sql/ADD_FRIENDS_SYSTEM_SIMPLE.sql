@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_friends_status ON friends(status);
 -- 5. Drop existing function if exists (to change return type)
 DROP FUNCTION IF EXISTS get_user_friends();
 
--- Create helper function
+-- Create helper function (deduplicates friends)
 CREATE OR REPLACE FUNCTION get_user_friends()
 RETURNS TABLE (
   friend_user_id UUID,
@@ -56,7 +56,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-  SELECT 
+  SELECT DISTINCT ON (p.id)
     p.id as friend_user_id,
     p.username,
     p.email,
@@ -71,7 +71,7 @@ BEGIN
   )
   WHERE (f.user_id = auth.uid() OR f.friend_id = auth.uid())
     AND f.status = 'accepted'
-  ORDER BY p.username;
+  ORDER BY p.id, p.username;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
