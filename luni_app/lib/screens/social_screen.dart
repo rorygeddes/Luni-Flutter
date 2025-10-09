@@ -769,10 +769,16 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                       }
                     } catch (e) {
                       if (mounted) {
+                        // Handle duplicate friend request gracefully
+                        final errorMessage = e.toString().contains('duplicate key') 
+                            ? '✅ Friend request already sent!'
+                            : 'Error: $e';
+                        final isAlreadySent = e.toString().contains('duplicate key');
+                        
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
+                            content: Text(errorMessage),
+                            backgroundColor: isAlreadySent ? Colors.orange : Colors.red,
                           ),
                         );
                       }
