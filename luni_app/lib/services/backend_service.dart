@@ -1397,6 +1397,19 @@ class BackendService {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      // Check if request already exists
+      final existing = await supabase
+          .from('friends')
+          .select()
+          .eq('user_id', user.id)
+          .eq('friend_id', friendUserId)
+          .maybeSingle();
+
+      if (existing != null) {
+        print('ℹ️ Friend request already exists');
+        return true; // Return true since request exists (not an error)
+      }
+
       await supabase.from('friends').insert({
         'user_id': user.id,
         'friend_id': friendUserId,

@@ -757,7 +757,7 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(success 
-                                ? '✅ Friend request sent!' 
+                                ? '✅ Friend request sent! Pending acceptance.' 
                                 : '❌ Failed to send friend request'),
                             backgroundColor: success ? Colors.green : Colors.red,
                           ),
@@ -769,16 +769,10 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
                       }
                     } catch (e) {
                       if (mounted) {
-                        // Handle duplicate friend request gracefully
-                        final errorMessage = e.toString().contains('duplicate key') 
-                            ? '✅ Friend request already sent!'
-                            : 'Error: $e';
-                        final isAlreadySent = e.toString().contains('duplicate key');
-                        
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(errorMessage),
-                            backgroundColor: isAlreadySent ? Colors.orange : Colors.red,
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
                           ),
                         );
                       }
