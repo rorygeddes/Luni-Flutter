@@ -445,15 +445,23 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
     return ListView(
       padding: EdgeInsets.symmetric(horizontal: 24.w),
       children: [
-        // Friend Requests Section
+        // Added Me Section (Pending Requests)
         if (_friendRequests.isNotEmpty) ...[
           SizedBox(height: 8.h),
           Text(
-            'Friend Requests (${_friendRequests.length})',
+            'Added me',
             style: TextStyle(
-              fontSize: 16.sp,
+              fontSize: 18.sp,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            '${_friendRequests.length} ${_friendRequests.length == 1 ? 'person' : 'people'} sent you a friend request',
+            style: TextStyle(
+              fontSize: 13.sp,
+              color: Colors.grey.shade600,
             ),
           ),
           SizedBox(height: 12.h),
@@ -463,14 +471,22 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
           SizedBox(height: 16.h),
         ],
         
-        // Friends List Section
+        // My Friends Section
         if (_friends.isNotEmpty) ...[
           Text(
-            'Friends (${_friends.length})',
+            'My Friends',
             style: TextStyle(
-              fontSize: 16.sp,
+              fontSize: 18.sp,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            '${_friends.length} ${_friends.length == 1 ? 'friend' : 'friends'}',
+            style: TextStyle(
+              fontSize: 13.sp,
+              color: Colors.grey.shade600,
             ),
           ),
           SizedBox(height: 12.h),
@@ -637,11 +653,11 @@ class _SocialScreenState extends State<SocialScreen> with AutomaticKeepAliveClie
   }
 
   Widget _buildFriendRequestCard(Map<String, dynamic> request) {
-    final profile = request['profiles'] as Map<String, dynamic>?;
+    final profile = request['requester_profile'] as Map<String, dynamic>?;
     final username = profile?['username'] as String? ?? 'Unknown';
     final fullName = profile?['full_name'] as String?;
     final avatarUrl = profile?['avatar_url'] as String?;
-    final requesterId = profile?['id'] as String;
+    final requesterId = profile?['id'] as String? ?? request['user_id'] as String;
 
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),

@@ -1431,14 +1431,33 @@ class BackendService {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      final response = await supabase
+      // Get pending friend requests
+      final requests = await supabase
           .from('friends')
-          .select('*, profiles!friends_user_id_fkey(id, username, email, full_name, avatar_url)')
+          .select('user_id, friend_id, status, created_at')
           .eq('friend_id', user.id)
           .eq('status', 'pending');
 
-      print('📬 Loaded ${(response as List).length} pending friend requests');
-      return (response as List).cast<Map<String, dynamic>>();
+      // Get profile info for each requester
+      final List<Map<String, dynamic>> enrichedRequests = [];
+      for (var request in requests as List) {
+        final requesterId = request['user_id'];
+        final profile = await supabase
+            .from('profiles')
+            .select('id, username, email, full_name, avatar_url')
+            .eq('id', requesterId)
+            .maybeSingle();
+        
+        if (profile != null) {
+          enrichedRequests.add({
+            ...request,
+            'requester_profile': profile,
+          });
+        }
+      }
+
+      print('📬 Loaded ${enrichedRequests.length} pending friend requests');
+      return enrichedRequests;
     } catch (e) {
       print('❌ Error getting friend requests: $e');
       return [];
