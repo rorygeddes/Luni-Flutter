@@ -253,7 +253,8 @@ class AuthService {
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+        authScreenLaunchMode: LaunchMode.inAppWebView, // force in-app full-screen modal
+        preferEphemeralSession: false,
       );
     } catch (e) {
       print('Google sign-in error: $e');
