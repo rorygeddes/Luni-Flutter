@@ -32,31 +32,31 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     // Play soft jingle if audio file exists
     _playJingle();
 
-    // Logo animation - bounce effect
+    // Logo animation - smooth fade in
     _logoController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    // Scale animation with elastic bounce
-    _logoScale = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _logoController,
-        curve: Curves.elasticOut,
-      ),
-    );
-
-    // Subtle rotation for dynamic feel
-    _logoRotation = Tween<double>(begin: -0.1, end: 0.0).animate(
+    // Scale animation with smooth ease
+    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoController,
         curve: Curves.easeOut,
       ),
     );
 
-    // Text animation - delayed fade in
+    // No rotation - just clean fade
+    _logoRotation = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _logoController,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    // Text animation - fade in after logo
     _textController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
@@ -75,13 +75,19 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ),
     );
 
-    // Start animations
-    _logoController.forward().then((_) {
-      _textController.forward();
+    // Start animations with exact timing:
+    // 1. Show logo immediately
+    _logoController.forward();
+    
+    // 2. After 2 seconds, fade in "Luni" text
+    Timer(const Duration(milliseconds: 2000), () {
+      if (mounted) {
+        _textController.forward();
+      }
     });
 
-    // Navigate after 2.5 seconds with smooth fade
-    Timer(const Duration(milliseconds: 2500), () {
+    // 3. After 3 seconds total, fade to app
+    Timer(const Duration(milliseconds: 3000), () {
       if (mounted) {
         _navigateToApp();
       }
@@ -164,7 +170,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                     child: Transform.rotate(
                       angle: _logoRotation.value,
                       child: Image.asset(
-                        'assets/images/Luni Logo.png',
+                        'assets/images/ChatGPT Image Oct 10 2025.png',
                         width: 280.w,
                         height: 280.h,
                         fit: BoxFit.contain,

@@ -101,7 +101,7 @@ class _MainLayoutState extends State<MainLayout> {
               children: [
                 CircleAvatar(
                   radius: 20.r,
-                  backgroundImage: const AssetImage('assets/images/Luni Logo.png'),
+                  backgroundImage: const AssetImage('assets/images/ChatGPT Image Oct 10 2025.png'),
                 ),
                 SizedBox(width: 12.w),
                 Text(
