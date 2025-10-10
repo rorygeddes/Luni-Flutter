@@ -32,13 +32,13 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     // Play soft jingle if audio file exists
     _playJingle();
 
-    // Logo animation - smooth fade in
+    // Logo animation - quick fade in
     _logoController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
-    // Scale animation with smooth ease
+    // Scale animation with smooth ease - fade in effect
     _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoController,
@@ -54,9 +54,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ),
     );
 
-    // Text animation - fade in after logo
+    // Text animation - quick fade in
     _textController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
 
@@ -76,18 +76,18 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     );
 
     // Start animations with exact timing:
-    // 1. Show logo immediately
+    // 1. Logo fades in immediately (starts at 0.0s)
     _logoController.forward();
     
-    // 2. After 2 seconds, fade in "Luni" text
-    Timer(const Duration(milliseconds: 2000), () {
+    // 2. After 0.5 seconds, fade in "Luni" text
+    Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
         _textController.forward();
       }
     });
 
-    // 3. After 5 seconds total, fade to app (text visible for 3 seconds)
-    Timer(const Duration(milliseconds: 5000), () {
+    // 3. After 2.5 seconds total, fade to app (stay visible for 1 second)
+    Timer(const Duration(milliseconds: 2500), () {
       if (mounted) {
         _navigateToApp();
       }
