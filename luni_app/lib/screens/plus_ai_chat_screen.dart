@@ -165,6 +165,8 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
       setState(() {
         _currentConversationId = conversationId;
         _messages.clear();
+        _agentActions.clear();
+        _currentMode = 'Chat Mode'; // Reset to chat mode
         for (var msg in messages) {
           _messages.add(ChatMessage(
             text: msg['content'] as String,
@@ -173,6 +175,10 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
           ));
         }
       });
+
+      // Create a new agent thread for this conversation (for auto mode)
+      _agentThreadId = await AIChatService.createAgentThread();
+      print('🤖 Agent thread created for loaded conversation: $_agentThreadId');
 
       _scrollToBottom();
     }
@@ -340,6 +346,20 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         return 'Checking account balances...';
       case 'find_transactions':
         return 'Searching transactions...';
+      case 'get_all_categories':
+        return 'Loading spending categories...';
+      case 'get_uncategorized_count':
+        return 'Checking uncategorized transactions...';
+      case 'get_friends':
+        return 'Looking up your friends...';
+      case 'get_groups':
+        return 'Loading your groups...';
+      case 'get_group_details':
+        return 'Getting group details...';
+      case 'get_person_split_history':
+        return 'Checking split history...';
+      case 'get_split_queue':
+        return 'Loading pending splits...';
       default:
         return 'Processing...';
     }
@@ -670,6 +690,46 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
         case 'find_transactions':
           final count = action.data!['count'] ?? 0;
           return 'Found $count matching transactions';
+          
+        case 'get_all_categories':
+          final count = action.data!['count'] ?? 0;
+          return 'Found $count spending categories';
+          
+        case 'get_uncategorized_count':
+          final count = action.data!['count'] ?? 0;
+          return count > 0 
+              ? '$count transactions need categorization'
+              : 'All transactions categorized';
+          
+        case 'get_friends':
+          final count = action.data!['count'] ?? 0;
+          return 'You have $count friend${count == 1 ? '' : 's'}';
+          
+        case 'get_groups':
+          final count = action.data!['count'] ?? 0;
+          return 'You have $count group${count == 1 ? '' : 's'}';
+          
+        case 'get_group_details':
+          final groupName = action.data!['group_name'] ?? 'Unknown';
+          final memberCount = action.data!['member_count'] ?? 0;
+          return 'Group "$groupName" has $memberCount member${memberCount == 1 ? '' : 's'}';
+          
+        case 'get_person_split_history':
+          final person = action.data!['person'] ?? 'Unknown';
+          final netBalance = action.data!['net_balance'] ?? 0.0;
+          if (netBalance > 0) {
+            return '$person owes you \$${netBalance.toStringAsFixed(2)}';
+          } else if (netBalance < 0) {
+            return 'You owe $person \$${(-netBalance).toStringAsFixed(2)}';
+          } else {
+            return 'You and $person are settled up';
+          }
+          
+        case 'get_split_queue':
+          final count = action.data!['count'] ?? 0;
+          return count > 0 
+              ? '$count transaction${count == 1 ? '' : 's'} waiting to be split'
+              : 'No pending splits';
           
         default:
           return '';

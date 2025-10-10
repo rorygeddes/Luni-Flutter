@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'backend_service.dart';
 import 'dart:async';
+import '../models/category_model.dart';
 
 class AIChatService {
   static final String _apiKey = dotenv.env['OPENAI_API_KEY'] ?? '';
@@ -467,10 +468,107 @@ Communication style:
           },
         },
       },
+      // === CATEGORIES ===
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_all_categories',
+          'description': 'Get all available spending categories and subcategories. Use when user asks about categories, what categories exist, or wants to know categorization options.',
+          'parameters': {
+            'type': 'object',
+            'properties': {},
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_uncategorized_count',
+          'description': 'Get count of uncategorized transactions that need review. Use when user asks about pending transactions or what needs to be categorized.',
+          'parameters': {
+            'type': 'object',
+            'properties': {},
+          },
+        },
+      },
+      // === SOCIAL & SPLITS ===
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_friends',
+          'description': 'Get list of user\'s friends. Use when user asks about their friends, who they can split with, or social connections.',
+          'parameters': {
+            'type': 'object',
+            'properties': {},
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_groups',
+          'description': 'Get list of user\'s groups. Use when user asks about their groups or who they split expenses with.',
+          'parameters': {
+            'type': 'object',
+            'properties': {},
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_group_details',
+          'description': 'Get detailed information about a specific group including members and balances. Use when user asks about a specific group, who owes who, or group expenses.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'group_name': {
+                'type': 'string',
+                'description': 'Name of the group to get details for',
+              },
+            },
+            'required': ['group_name'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_person_split_history',
+          'description': 'Get split transaction history with a specific person. Use when user asks about what they owe someone or what someone owes them.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'person_name': {
+                'type': 'string',
+                'description': 'Name or username of the person',
+              },
+            },
+            'required': ['person_name'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'get_split_queue',
+          'description': 'Get pending split transactions that need to be assigned. Use when user asks about pending splits or what needs to be split.',
+          'parameters': {
+            'type': 'object',
+            'properties': {},
+          },
+        },
+      },
     ];
   }
 
   /// Execute agent tool functions
+  /// 
+  /// 🔒 SECURITY: All data access is automatically filtered by the current user.
+  /// BackendService uses Supabase.instance.client which includes the user's JWT token.
+  /// Supabase Row Level Security (RLS) policies enforce that users can ONLY access
+  /// their own data (transactions, accounts, friends, groups, etc.).
+  /// No user can access another user's data through the AI agent.
   static Future<Map<String, dynamic>> _executeAgentTool(
     String functionName,
     Map<String, dynamic> arguments,
@@ -592,7 +690,10 @@ Communication style:
           
           for (var account in accounts) {
             // BackendService.getAccounts() returns 'balance' field (not 'current_balance')
-            final balance = (account['balance'] as num?)?.toDouble() ?? 0.0;
+            // Use safer null handling to avoid type cast errors
+            final balanceValue = account['balance'];
+            final balance = (balanceValue is num) ? balanceValue.toDouble() : 0.0;
+            
             final name = account['name'] as String? ?? 'Unknown Account';
             final type = account['type'] as String? ?? 'Unknown Type';
             final currency = account['display_currency'] as String? ?? 'CAD';
@@ -639,6 +740,162 @@ Communication style:
                       'date': t['date'] ?? '',
                     })
                 .toList(),
+          };
+
+        case 'get_all_categories':
+          final categories = await BackendService.getCategories();
+          
+          // Group categories by parent
+          final Map<String, List<String>> grouped = {};
+          for (var cat in categories) {
+            if (!grouped.containsKey(cat.parentKey)) {
+              grouped[cat.parentKey] = [];
+            }
+            grouped[cat.parentKey]!.add(cat.name);
+          }
+          
+          final categoryList = grouped.entries.map((entry) => {
+            'parent': entry.key,
+            'parent_display': CategoryModel.getParentDisplayName(entry.key),
+            'icon': CategoryModel.getParentIcon(entry.key),
+            'subcategories': entry.value,
+            'count': entry.value.length,
+          }).toList();
+          
+          print('✅ Agent tool: Found ${categoryList.length} parent categories with ${categories.length} subcategories');
+          
+          return {
+            'categories': categoryList,
+            'parent_count': categoryList.length,
+            'total_count': categories.length,
+          };
+
+        case 'get_uncategorized_count':
+          final count = await BackendService.getUncategorizedCount();
+          
+          print('✅ Agent tool: Found $count uncategorized transactions');
+          
+          return {
+            'count': count,
+            'message': count > 0 
+                ? '$count transactions need to be categorized'
+                : 'All transactions are categorized',
+          };
+
+        case 'get_friends':
+          final friends = await BackendService.getFriends();
+          
+          final friendList = friends.map((f) => {
+            'username': f['username'] as String? ?? 'Unknown',
+            'full_name': f['full_name'] as String? ?? '',
+            'profile_image': f['profile_image_url'] as String?,
+          }).toList();
+          
+          print('✅ Agent tool: Found ${friendList.length} friends');
+          
+          return {
+            'friends': friendList,
+            'count': friendList.length,
+          };
+
+        case 'get_groups':
+          final groups = await BackendService.getUserGroups();
+          
+          final groupList = groups.map((g) => {
+            'name': g['name'] as String? ?? 'Unknown',
+            'created_at': g['created_at'] as String?,
+          }).toList();
+          
+          print('✅ Agent tool: Found ${groupList.length} groups');
+          
+          return {
+            'groups': groupList,
+            'count': groupList.length,
+          };
+
+        case 'get_group_details':
+          final groupName = arguments['group_name'] as String;
+          final groups = await BackendService.getUserGroups();
+          
+          // Find the group by name
+          final group = groups.firstWhere(
+            (g) => (g['name'] as String).toLowerCase() == groupName.toLowerCase(),
+            orElse: () => <String, dynamic>{},
+          );
+          
+          if (group.isEmpty) {
+            return {
+              'error': 'Group "$groupName" not found',
+              'available_groups': groups.map((g) => g['name']).toList(),
+            };
+          }
+          
+          final groupId = group['id'] as String;
+          final details = await BackendService.getGroupDetails(groupId);
+          
+          print('✅ Agent tool: Got details for group "$groupName"');
+          
+          return {
+            'group_name': details['group_name'],
+            'member_count': details['member_count'],
+            'members': details['members'],
+            'balances': details['balances'],
+            'transactions': details['transactions'],
+          };
+
+        case 'get_person_split_history':
+          final personName = arguments['person_name'] as String;
+          final friends = await BackendService.getFriends();
+          
+          // Find the person by username or full name
+          final person = friends.firstWhere(
+            (f) {
+              final username = (f['username'] as String? ?? '').toLowerCase();
+              final fullName = (f['full_name'] as String? ?? '').toLowerCase();
+              final search = personName.toLowerCase();
+              return username.contains(search) || fullName.contains(search);
+            },
+            orElse: () => <String, dynamic>{},
+          );
+          
+          if (person.isEmpty) {
+            return {
+              'error': 'Person "$personName" not found',
+              'available_people': friends.map((f) => f['username']).toList(),
+            };
+          }
+          
+          final userId = person['id'] as String;
+          final history = await BackendService.getPersonSplitHistory(userId);
+          
+          print('✅ Agent tool: Got split history with "${person['username']}"');
+          
+          return {
+            'person': person['username'],
+            'full_name': person['full_name'],
+            'you_owe': history['you_owe'],
+            'they_owe': history['they_owe'],
+            'net_balance': history['net_balance'],
+            'recent_transactions': history['transactions'],
+          };
+
+        case 'get_split_queue':
+          final queue = await BackendService.getSplitQueue();
+          
+          final queueList = queue.map((t) => {
+            'description': t.aiDescription ?? t.description,
+            'amount': t.amount,
+            'date': t.date.toString().split(' ')[0],
+          }).toList();
+          
+          print('✅ Agent tool: Found ${queueList.length} items in split queue');
+          
+          return {
+            'count': queueList.length,
+            'transactions': queueList,
+            'message': queueList.isEmpty 
+                ? 'No pending split transactions'
+                : '${queueList.length} transactions waiting to be split',
           };
 
         default:

@@ -17,7 +17,7 @@ class BackendService {
   // Get Plaid credentials from .env file
   static String get _plaidClientId => dotenv.env['PLAID_CLIENT_ID'] ?? '';
   static String get _plaidSecret => dotenv.env['PLAID_SECRET'] ?? '';
-  static String get _plaidEnvironment => dotenv.env['PLAID_ENVIRONMENT'] ?? 'sandbox';
+  static String get _plaidEnvironment => dotenv.env['PLAID_ENV'] ?? 'sandbox';
   
   static String get _plaidBaseUrl {
     switch (_plaidEnvironment) {
