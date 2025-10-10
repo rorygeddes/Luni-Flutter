@@ -86,8 +86,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       }
     });
 
-    // 3. After 3 seconds total, fade to app
-    Timer(const Duration(milliseconds: 3000), () {
+    // 3. After 5 seconds total, fade to app (text visible for 3 seconds)
+    Timer(const Duration(milliseconds: 5000), () {
       if (mounted) {
         _navigateToApp();
       }
