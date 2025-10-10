@@ -46,7 +46,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ),
     );
 
-    // No rotation - just clean fade
+    // No rotation - just clean
     _logoRotation = Tween<double>(begin: 0.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _logoController,
@@ -54,9 +54,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ),
     );
 
-    // Text animation - quick fade in
+    // Text animation - 1s fade duration
     _textController = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
@@ -67,27 +67,19 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       ),
     );
 
-    // Fade out animation for smooth transition
-    _screenFadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _logoController,
-        curve: Curves.easeOut,
-      ),
-    );
-
     // Start animations with exact timing:
-    // 1. Logo fades in immediately (starts at 0.0s)
+    // 1) Logo visible immediately
     _logoController.forward();
-    
-    // 2. After 0.5 seconds, fade in "Luni" text
+
+    // 2) After 0.5s, start text fade (1s long)
     Timer(const Duration(milliseconds: 500), () {
       if (mounted) {
         _textController.forward();
       }
     });
 
-    // 3. After 2.5 seconds total, fade to app (stay visible for 1 second)
-    Timer(const Duration(milliseconds: 2500), () {
+    // 3) Navigate at 1.5s total
+    Timer(const Duration(milliseconds: 1500), () {
       if (mounted) {
         _navigateToApp();
       }
