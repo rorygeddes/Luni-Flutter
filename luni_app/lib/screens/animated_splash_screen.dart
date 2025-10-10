@@ -32,14 +32,14 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     // Play soft jingle if audio file exists
     _playJingle();
 
-    // Logo animation - quick fade in
+    // Logo animation - appears immediately (no fade)
     _logoController = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 1),
       vsync: this,
     );
 
-    // Scale animation with smooth ease - fade in effect
-    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // Logo appears at full scale immediately
+    _logoScale = Tween<double>(begin: 1.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoController,
         curve: Curves.easeOut,
