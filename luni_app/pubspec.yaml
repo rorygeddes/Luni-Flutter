@@ -81,6 +81,12 @@ dependencies:
   
   # Environment variables
   flutter_dotenv: ^5.1.0
+  
+  # Animations
+  lottie: ^3.0.0
+  
+  # Audio for splash screen
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:

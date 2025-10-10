@@ -13,6 +13,7 @@ import 'screens/wallet_modal.dart';
 import 'screens/main_layout.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
+import 'screens/animated_splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_provider.dart';
 import 'providers/onboarding_provider.dart';
@@ -69,7 +70,7 @@ class LuniApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
-            home: const AppInitializer(),
+            home: const AnimatedSplashScreen(),
             navigatorKey: NavigationService.navigatorKey,
           );
         },
