@@ -20,7 +20,9 @@ import 'onboarding/onboarding_flow_screen.dart';
 import 'main_layout.dart';
 
 class LuniHomeScreen extends StatefulWidget {
-  const LuniHomeScreen({super.key});
+  const LuniHomeScreen({super.key, this.initialUserProfile});
+
+  final UserModel? initialUserProfile;
 
   @override
   State<LuniHomeScreen> createState() => _LuniHomeScreenState();
@@ -38,6 +40,8 @@ class _LuniHomeScreenState extends State<LuniHomeScreen> with AutomaticKeepAlive
   @override
   void initState() {
     super.initState();
+    // Seed initial profile to avoid no-profile flicker
+    _userProfile = widget.initialUserProfile;
     _loadData();
   }
 

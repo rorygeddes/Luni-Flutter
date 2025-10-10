@@ -6,6 +6,8 @@ import 'main_layout.dart';
 import 'auth/sign_in_screen.dart';
 import '../main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
+import '../models/user_model.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key});
@@ -102,17 +104,39 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     try {
       final user = Supabase.instance.client.auth.currentUser;
       
+      if (user != null) {
+        // Preload profile to avoid flicker
+        AuthService.getCurrentUserProfile().then((UserModel? profile) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  MainLayout(currentRoute: '/', initialUserProfile: profile),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: child,
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 300),
+            ),
+          );
+        });
+        return;
+      }
+
+      // If no user, go to sign in
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              user == null ? const SignInScreen() : const AppInitializer(),
+              const SignInScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: animation,
               child: child,
             );
           },
-          transitionDuration: const Duration(milliseconds: 500),
+          transitionDuration: const Duration(milliseconds: 300),
         ),
       );
     } catch (e) {
@@ -127,7 +151,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               child: child,
             );
           },
-          transitionDuration: const Duration(milliseconds: 500),
+          transitionDuration: const Duration(milliseconds: 300),
         ),
       );
     }

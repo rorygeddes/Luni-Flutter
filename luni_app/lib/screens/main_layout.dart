@@ -10,10 +10,12 @@ import 'profile_view.dart';
 
 class MainLayout extends StatefulWidget {
   final String currentRoute;
+  final UserModel? initialUserProfile;
 
   const MainLayout({
     super.key,
     required this.currentRoute,
+    this.initialUserProfile,
   });
 
   @override
@@ -71,7 +73,7 @@ class _MainLayoutState extends State<MainLayout> {
                     controller: _pageController,
                     onPageChanged: _onPageChanged,
                     children: [
-                      LuniHomeScreen(),
+                      LuniHomeScreen(initialUserProfile: widget.initialUserProfile),
                       TrackScreen(),
                       SplitScreen(),
                       SocialScreen(),
