@@ -7,6 +7,7 @@ import 'split_screen.dart';
 import 'social_screen.dart';
 import 'plus_ai_chat_screen.dart';
 import 'profile_view.dart';
+import '../models/user_model.dart';
 
 class MainLayout extends StatefulWidget {
   final String currentRoute;
