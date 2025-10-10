@@ -254,6 +254,9 @@ class AuthService {
         OAuthProvider.google,
         redirectTo: redirectUrl,
         authScreenLaunchMode: LaunchMode.inAppWebView, // force in-app full-screen modal
+        queryParams: {
+          'prompt': 'select_account', // show Google account chooser
+        },
       );
     } catch (e) {
       print('Google sign-in error: $e');
