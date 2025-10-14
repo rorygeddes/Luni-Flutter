@@ -38,6 +38,10 @@ class OnboardingProvider extends ChangeNotifier {
   // Categories
   Map<String, List<String>> _customSubcategories = {};
 
+  // New onboarding fields
+  String? _lifeStage; // Student, Young Professional, Settling In, Parent, Retiring/Retired
+  bool _demoMode = false;
+
   // Getters
   String? get school => _school;
   String? get city => _city;
@@ -58,6 +62,8 @@ class OnboardingProvider extends ChangeNotifier {
   List<String> get frequentMerchants => _frequentMerchants;
   List<String> get customMerchants => _customMerchants;
   Map<String, List<String>> get customSubcategories => _customSubcategories;
+  String? get lifeStage => _lifeStage;
+  bool get demoMode => _demoMode;
 
   // Setters
   void setSchool(String? school) {
@@ -162,6 +168,16 @@ class OnboardingProvider extends ChangeNotifier {
 
   void setCustomSubcategories(Map<String, List<String>> subcategories) {
     _customSubcategories = subcategories;
+    notifyListeners();
+  }
+
+  void setLifeStage(String? value) {
+    _lifeStage = value;
+    notifyListeners();
+  }
+
+  void setDemoMode(bool value) {
+    _demoMode = value;
     notifyListeners();
   }
 

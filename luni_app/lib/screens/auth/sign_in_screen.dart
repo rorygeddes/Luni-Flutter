@@ -10,6 +10,7 @@ import '../main_layout.dart';
 import '../../widgets/luni_button.dart';
 import 'sign_up_screen.dart';
 import '../../widgets/luni_button.dart';
+import '../onboarding/onboarding_flow_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -48,10 +49,10 @@ class _SignInScreenState extends State<SignInScreen> {
         // Handle OAuth callback and create profile if needed
         await AuthService.handleOAuthCallback();
         
-        // Navigate to main app
+        // Navigate to onboarding flow (first-time) → then to main app
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const MainLayout(currentRoute: '/'),
+            builder: (context) => const OnboardingFlowScreen(),
           ),
         );
       }
@@ -70,11 +71,11 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (response.user != null) {
-        // Navigate to main app
+        // Navigate to onboarding flow first
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const MainLayout(currentRoute: '/'),
+              builder: (context) => const OnboardingFlowScreen(),
             ),
           );
         }

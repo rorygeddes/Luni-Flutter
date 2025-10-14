@@ -8,6 +8,7 @@ import '../main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import 'onboarding/onboarding_flow_screen.dart';
 
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key});
@@ -125,7 +126,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
         return;
       }
 
-      // If no user, go to sign in
+      // If no user, go to sign in → then onboarding flow
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
