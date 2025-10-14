@@ -29,6 +29,7 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
   String? _agentThreadId; // OpenAI thread ID for agent conversations
   final List<AgentAction> _agentActions = [];
   String _currentMode = 'Chat Mode'; // Displays which mode was used: 'Chat Mode' or 'Agent Mode'
+  bool _webSearchEnabled = false; // Toggle for web search workflow
 
   @override
   void initState() {
@@ -232,6 +233,29 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
     }
 
     try {
+      // Web Search workflow (short-circuit when enabled)
+      if (_webSearchEnabled) {
+        setState(() {
+          _currentMode = 'Web Search';
+        });
+        final aiResponse = await AIChatService.runWebSearchAgent(userQuery: userMessage);
+        if (!mounted) return;
+        setState(() {
+          _messages.add(ChatMessage(
+            text: aiResponse,
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+        await BackendService.saveAIMessage(
+          conversationId: _currentConversationId!,
+          role: 'assistant',
+          content: aiResponse,
+        );
+        _scrollToBottom();
+        return;
+      }
       // ======== AUTO MODE (AI decides whether to use tools) ========
       bool usedTools = false;
       
@@ -504,10 +528,41 @@ class _PlusAIChatScreenState extends State<PlusAIChatScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    SizedBox(width: 8.w),
+                    if (_webSearchEnabled)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.blueAccent, width: 1.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.public, size: 12.w, color: Colors.blueAccent),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Web Search On',
+                              style: TextStyle(fontSize: 11.sp, color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
+          ),
+          // Toggle web search agent
+          LuniIconButton(
+            icon: _webSearchEnabled ? Icons.public : Icons.public_off,
+            onPressed: () => setState(() {
+              _webSearchEnabled = !_webSearchEnabled;
+              _currentMode = _webSearchEnabled ? 'Web Search' : 'Chat Mode';
+            }),
+            color: _webSearchEnabled ? Colors.blueAccent : Colors.black87,
+            size: 24.w,
           ),
           LuniIconButton(
             icon: Icons.close,

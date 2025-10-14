@@ -13,6 +13,9 @@ class AIChatService {
   
   // Store assistant ID (create once, reuse)
   static String? _assistantId;
+  // Separate assistants for the web search workflow
+  static String? _searchApiMasterAssistantId; // uses web_search
+  static String? _searchAgentAssistantId;     // consumes apiMaster output and answers
 
   // Send a chat message and get a response
   static Future<String> sendMessage({
@@ -198,6 +201,221 @@ Communication style:
       print('❌ Error in _getOrCreateAssistant: $e');
       rethrow;
     }
+  }
+
+  // ========================= WEB SEARCH AGENT (Agent-Builder parity) =========================
+  // apiMaster: finds an open/free API using web search and drafts concise docs/how-to-call
+  static Future<String> _getOrCreateSearchApiMaster() async {
+    if (_searchApiMasterAssistantId != null) return _searchApiMasterAssistantId!;
+    try {
+      final response = await http.post(
+        Uri.parse(_assistantsUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({
+          'name': 'API MASTER',
+          'instructions': 'You are a helpful assistant. Your job is to search the web for an open and free-to-use API to get the data the user wants. You will then create short, concise documentation on how the API works and how to call it correctly.',
+          'model': 'gpt-4o',
+          // Enable OpenAI built-in web search tool
+          'tools': [
+            {'type': 'web_search'}
+          ],
+          'metadata': {
+            'role': 'api_master'
+          }
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _searchApiMasterAssistantId = data['id'] as String;
+        print('✅ Created WebSearch API Master assistant: $_searchApiMasterAssistantId');
+        return _searchApiMasterAssistantId!;
+      } else {
+        print('❌ Error creating API Master: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to create web search assistant');
+      }
+    } catch (e) {
+      print('❌ Error in _getOrCreateSearchApiMaster: $e');
+      rethrow;
+    }
+  }
+
+  // downstream agent: takes apiMaster output and answers the user succinctly
+  static Future<String> _getOrCreateSearchAgent() async {
+    if (_searchAgentAssistantId != null) return _searchAgentAssistantId!;
+    try {
+      final response = await http.post(
+        Uri.parse(_assistantsUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({
+          'name': 'Luni Web Search Agent',
+          'instructions': 'Your job is to use the provided API documentation (from the API MASTER) to return a concise, correct answer and include a minimal example of how to call the API when helpful.',
+          'model': 'gpt-4o',
+          // No extra tools required here; we consume the apiMaster summary
+          'tools': [],
+          'metadata': {
+            'role': 'search_agent'
+          }
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _searchAgentAssistantId = data['id'] as String;
+        print('✅ Created WebSearch downstream agent: $_searchAgentAssistantId');
+        return _searchAgentAssistantId!;
+      } else {
+        print('❌ Error creating WebSearch Agent: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to create web search downstream assistant');
+      }
+    } catch (e) {
+      print('❌ Error in _getOrCreateSearchAgent: $e');
+      rethrow;
+    }
+  }
+
+  /// Run the two-stage web search workflow. Returns the final answer text.
+  static Future<String> runWebSearchAgent({
+    required String userQuery,
+  }) async {
+    try {
+      // Prepare assistants
+      final apiMasterId = await _getOrCreateSearchApiMaster();
+      final agentId = await _getOrCreateSearchAgent();
+
+      // Create one shared thread to preserve context between the two runs
+      final threadRes = await http.post(
+        Uri.parse(_threadsUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({}),
+      );
+      if (threadRes.statusCode != 200) {
+        throw Exception('Failed to create thread for web search');
+      }
+      final threadId = (json.decode(threadRes.body))['id'] as String;
+
+      // Seed with the user query
+      await http.post(
+        Uri.parse('$_threadsUrl/$threadId/messages'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({'role': 'user', 'content': userQuery}),
+      );
+
+      // Run API MASTER (with web_search)
+      final run1 = await http.post(
+        Uri.parse('$_threadsUrl/$threadId/runs'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({'assistant_id': apiMasterId}),
+      );
+      if (run1.statusCode != 200) {
+        throw Exception('Failed to start web search (api master)');
+      }
+      final run1Id = (json.decode(run1.body))['id'] as String;
+      await _waitForRunCompletion(threadId: threadId, runId: run1Id);
+
+      // Fetch apiMaster output and feed it into the second run
+      final lastMessage = await _getLatestMessage(threadId);
+      final docs = lastMessage ?? '';
+
+      // Inject the apiMaster output as additional context
+      await http.post(
+        Uri.parse('$_threadsUrl/$threadId/messages'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({
+          'role': 'user',
+          'content': 'Use the following API notes to answer the question succinctly and include a minimal example when useful. NOTES:\n\n$docs',
+        }),
+      );
+
+      // Run downstream agent
+      final run2 = await http.post(
+        Uri.parse('$_threadsUrl/$threadId/runs'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+        body: json.encode({'assistant_id': agentId}),
+      );
+      if (run2.statusCode != 200) {
+        throw Exception('Failed to start downstream agent');
+      }
+      final run2Id = (json.decode(run2.body))['id'] as String;
+      await _waitForRunCompletion(threadId: threadId, runId: run2Id);
+
+      final finalText = await _getLatestMessage(threadId) ?? 'No output produced.';
+      return finalText;
+    } catch (e) {
+      print('❌ Error in runWebSearchAgent: $e');
+      return 'Sorry, I could not complete the web search right now.';
+    }
+  }
+
+  static Future<void> _waitForRunCompletion({
+    required String threadId,
+    required String runId,
+  }) async {
+    while (true) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      final res = await http.get(
+        Uri.parse('$_threadsUrl/$threadId/runs/$runId'),
+        headers: {
+          'Authorization': 'Bearer $_apiKey',
+          'OpenAI-Beta': 'assistants=v2',
+        },
+      );
+      if (res.statusCode != 200) {
+        throw Exception('Failed to poll run');
+      }
+      final data = json.decode(res.body) as Map<String, dynamic>;
+      final status = data['status'] as String;
+      if (status == 'completed') return;
+      if (status == 'failed' || status == 'cancelled' || status == 'expired') {
+        throw Exception('Run $status');
+      }
+    }
+  }
+
+  static Future<String?> _getLatestMessage(String threadId) async {
+    final res = await http.get(
+      Uri.parse('$_threadsUrl/$threadId/messages?limit=1'),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'OpenAI-Beta': 'assistants=v2',
+      },
+    );
+    if (res.statusCode != 200) return null;
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final list = data['data'] as List<dynamic>;
+    if (list.isEmpty) return null;
+    final content = list.first['content'] as List<dynamic>;
+    if (content.isEmpty) return null;
+    final text = content.first['text']?['value'] as String?;
+    return text;
   }
 
   /// Send message with agent mode (uses Assistants API)

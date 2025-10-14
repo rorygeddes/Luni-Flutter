@@ -576,7 +576,7 @@ class BackendService {
     }
   }
 
-  // Sync new transactions for all connected accounts
+  // Sync new transactions for all connected accounts using Plaid transactions/sync
   static Future<void> syncTransactions() async {
     try {
       final supabase = Supabase.instance.client;
@@ -585,7 +585,14 @@ class BackendService {
 
       print('🔄 Syncing transactions...');
 
-      // Get all institutions (with access tokens)
+      // Kick Plaid to fetch fresh data before we pull incremental updates
+      try {
+        await _refreshPlaidTransactions();
+      } catch (e) {
+        print('⚠️  Plaid refresh failed (continuing with sync): $e');
+      }
+
+      // Get all institutions (with access tokens and cursor)
       final institutions = await supabase
           .from('institutions')
           .select()
@@ -603,90 +610,197 @@ class BackendService {
         if (accessToken == null) continue;
 
         final itemId = institution['item_id'] as String;
-        print('📊 Syncing institution: ${institution['name']} ($itemId)');
+        final name = institution['name'] ?? 'Institution';
+        final existingCursor = institution['plaid_cursor'] as String?;
+        print('📊 Syncing institution: $name ($itemId)');
 
-        // Get transactions from last 30 days (for sync)
-        final startDate = DateTime.now().subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
-        final endDate = DateTime.now().toIso8601String().split('T')[0];
+        String? cursor = existingCursor;
+        String? nextCursor;
+        int newCount = 0;
+        int duplicatesDetected = 0;
+        bool hasMore = true;
 
-        final response = await http.post(
-          Uri.parse('$_plaidBaseUrl/transactions/get'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'client_id': _plaidClientId,
-            'secret': _plaidSecret,
-            'access_token': accessToken,
-            'start_date': startDate,
-            'end_date': endDate,
-            'options': {
-              'count': 500,
-              'offset': 0,
-            },
-          }),
-        );
+        // Bootstrap: if no cursor, fast-forward cursor to "now" (no historical import)
+        if (cursor == null) {
+          print('🧭 Bootstrap cursor to now (skip history)');
+          final res = await http.post(
+            Uri.parse('$_plaidBaseUrl/transactions/sync'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'client_id': _plaidClientId,
+              'secret': _plaidSecret,
+              'access_token': accessToken,
+              'cursor': 'now',
+              'options': {'count': 1},
+            }),
+          );
+          if (res.statusCode != 200) {
+            print('  ❌ Error (bootstrap): ${res.body}');
+          } else {
+            final data = json.decode(res.body);
+            nextCursor = data['next_cursor'] as String?;
+          }
+          if (nextCursor != null) {
+            await supabase
+                .from('institutions')
+                .update({'plaid_cursor': nextCursor, 'last_synced_at': DateTime.now().toIso8601String()})
+                .eq('item_id', itemId)
+                .eq('user_id', user.id);
+            print('🧭 Cursor bootstrapped');
+          }
+          continue; // move to next institution this run
+        }
 
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final transactions = data['transactions'] as List<dynamic>;
-
-          // Save new transactions with duplicate detection
-          int newCount = 0;
-          int duplicatesDetected = 0;
-          
-          for (final transaction in transactions) {
+        // Incremental sync using stored cursor
+        while (hasMore) {
+          // Keep track of the page start cursor to be able to restart pagination on mutation error
+          final pageStartCursor = cursor;
+          int paginationRetries = 0;
+          final res = await http.post(
+            Uri.parse('$_plaidBaseUrl/transactions/sync'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'client_id': _plaidClientId,
+              'secret': _plaidSecret,
+              'access_token': accessToken,
+              'cursor': cursor,
+              'options': {'count': 500},
+            }),
+          );
+          if (res.statusCode != 200) {
+            // If a pagination mutation error occurs, restart the page from the first cursor in this page
             try {
-              final transactionId = transaction['transaction_id'];
-              final accountId = transaction['account_id'];
-              final amount = (transaction['amount'] ?? 0.0) * -1;
-              final description = transaction['name'] ?? 'Unknown';
-              final date = transaction['date'] ?? DateTime.now().toIso8601String().split('T')[0];
-              
-              // Check if transaction already exists (exact match by ID)
+              final err = json.decode(res.body) as Map<String, dynamic>;
+              final code = err['error_code'] as String?;
+              if (code == 'TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION' && paginationRetries < 2) {
+                print('  🔁 Pagination mutation detected. Restarting page from cursor...');
+                cursor = pageStartCursor;
+                paginationRetries++;
+                continue; // retry this page
+              }
+            } catch (_) {}
+            print('  ❌ Error: ${res.body}');
+            break;
+          }
+          final data = json.decode(res.body);
+          nextCursor = data['next_cursor'] as String?;
+          hasMore = data['has_more'] == true;
+
+          final added = (data['added'] as List?) ?? const [];
+          final removed = (data['removed'] as List?) ?? const [];
+
+          // Process removed first: delete transactions by id
+          if (removed.isNotEmpty) {
+            final removedIds = removed.map((r) => r['transaction_id'] as String).toList();
+            if (removedIds.isNotEmpty) {
+              for (final rid in removedIds) {
+                try {
+                  await supabase
+                      .from('transactions')
+                      .delete()
+                      .eq('id', rid)
+                      .eq('user_id', user.id);
+                } catch (e) {
+                  print('  ⚠️  Failed to delete removed transaction $rid: $e');
+                }
+              }
+              print('  🗑️  Removed ${removedIds.length} transactions (bank corrections)');
+            }
+          }
+
+          // Process added: only new since last cursor
+          for (final t in added) {
+            try {
+              final transactionId = t['transaction_id'];
+              final accountId = t['account_id'];
+              final amount = ((t['amount'] ?? 0.0) as num).toDouble() * -1;
+              final description = t['name'] ?? 'Unknown';
+              final date = t['date'] ?? DateTime.now().toIso8601String().split('T')[0];
+              final pendingId = t['pending_transaction_id'] as String?;
+
+              // If Plaid replaced a pending txn with a posted one, remove the old pending by its id
+              if (pendingId != null && pendingId.isNotEmpty) {
+                try {
+                  final pendingExists = await supabase
+                      .from('transactions')
+                      .select('id')
+                      .eq('id', pendingId)
+                      .eq('user_id', user.id)
+                      .maybeSingle();
+                  if (pendingExists != null) {
+                    await supabase
+                        .from('transactions')
+                        .delete()
+                        .eq('id', pendingId)
+                        .eq('user_id', user.id);
+                    print('  🔄 Replaced pending transaction $pendingId with posted $transactionId');
+                  }
+                } catch (e) {
+                  print('  ⚠️  Could not remove pending $pendingId: $e');
+                }
+              }
+
+              // Skip if already exists by ID
               final existingById = await supabase
                   .from('transactions')
                   .select('id')
                   .eq('id', transactionId)
+                  .eq('user_id', user.id)
                   .maybeSingle();
-              
               if (existingById != null) {
-                print('  ⏭️  Skipped (already exists): $description (\$$amount)');
                 continue;
               }
-              
-              // Check for potential duplicates (same account, amount, description, within 3 days)
-              final potentialDuplicates = await supabase
-                  .rpc('find_potential_duplicates', params: {
-                    'p_account_id': accountId,
-                    'p_date': date,
-                    'p_amount': amount,
-                    'p_description': description,
-                    'p_transaction_id': transactionId,
-                  });
-              
+
+              // Duplicate scoring (non-blocking). Also prevent same-day same-amount same-desc duplicates per account.
+              List<dynamic> potentialDuplicates = const [];
+              try {
+                final rpcResult = await supabase.rpc('find_potential_duplicates', params: {
+                  'p_account_id': accountId,
+                  'p_date': date,
+                  'p_amount': amount,
+                  'p_description': description,
+                  'p_transaction_id': transactionId,
+                });
+                if (rpcResult is List) potentialDuplicates = rpcResult;
+              } catch (dupErr) {
+                print('  ⚠️  Duplicate check failed (continuing): $dupErr');
+              }
+
               bool isPotentialDuplicate = false;
               String? duplicateOfId;
-              
-              if (potentialDuplicates != null && potentialDuplicates.isNotEmpty) {
+              if (potentialDuplicates.isNotEmpty) {
                 final firstMatch = potentialDuplicates[0];
                 final matchScore = firstMatch['match_score'] ?? 0;
-                
-                // If match score >= 80, flag as potential duplicate
                 if (matchScore >= 80) {
                   isPotentialDuplicate = true;
                   duplicateOfId = firstMatch['id'];
                   duplicatesDetected++;
-                  print('  🚨 Potential duplicate detected: $description (\$$amount) - Match score: $matchScore');
                 }
               }
-              
+
+              // Hard guard: if an identical transaction already exists for same account/date/amount/description, skip insert altogether
+              final existsSame = await supabase
+                  .from('transactions')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .eq('account_id', accountId)
+                  .eq('date', date)
+                  .eq('amount', amount)
+                  .eq('description', description)
+                  .maybeSingle();
+              if (existsSame != null) {
+                print('  ⏭️  Skipped (identical already exists): $description ($amount) on $date');
+                continue;
+              }
+
               final transactionData = {
                 'id': transactionId,
                 'user_id': user.id,
                 'account_id': accountId,
                 'amount': amount,
-                'original_currency': transaction['iso_currency_code'] ?? 'CAD',
+                'original_currency': t['iso_currency_code'] ?? 'CAD',
                 'description': description,
-                'merchant_name': transaction['merchant_name'],
+                'merchant_name': t['merchant_name'],
                 'date': date,
                 'category': null,
                 'subcategory': null,
@@ -696,27 +810,29 @@ class BackendService {
                 'created_at': DateTime.now().toIso8601String(),
                 'updated_at': DateTime.now().toIso8601String(),
               };
-              
-              // Insert transaction (with duplicate flag if applicable)
+
               await supabase.from('transactions').insert(transactionData);
-              
-              if (isPotentialDuplicate) {
-                print('  ⚠️  Added with duplicate flag: $description (\$$amount)');
-              } else {
-                print('  ✅ Saved: $description (\$$amount) on $date');
-              }
-              
               newCount++;
             } catch (e) {
               print('  ⚠️  Error processing transaction: $e');
             }
           }
-          
-          print('  ✅ Synced $newCount new transactions ($duplicatesDetected potential duplicates flagged)');
-          totalNewTransactions += newCount;
-        } else {
-          print('  ❌ Error: ${response.body}');
+
+          // advance cursor for next page
+          cursor = nextCursor ?? cursor;
         }
+
+        // Persist final cursor
+        if (nextCursor != null) {
+          await supabase
+              .from('institutions')
+              .update({'plaid_cursor': nextCursor, 'last_synced_at': DateTime.now().toIso8601String()})
+              .eq('item_id', itemId)
+              .eq('user_id', user.id);
+        }
+
+        print('  ✅ Synced $newCount new transactions ($duplicatesDetected potential duplicates flagged)');
+        totalNewTransactions += newCount;
       }
 
       print('✅ Sync complete! $totalNewTransactions new transactions added');
@@ -724,6 +840,159 @@ class BackendService {
       print('❌ Error syncing transactions: $e');
       throw e;
     }
+  }
+
+  // Force Plaid to check for new transactions for all institutions (optional but helps when user expects immediate updates)
+  static Future<void> _refreshPlaidTransactions() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final institutions = await supabase
+        .from('institutions')
+        .select('access_token, item_id, name')
+        .eq('user_id', user.id);
+
+    for (final inst in institutions) {
+      final accessToken = inst['access_token'] as String?;
+      if (accessToken == null) continue;
+      try {
+        final res = await http.post(
+          Uri.parse('$_plaidBaseUrl/transactions/refresh'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'client_id': _plaidClientId,
+            'secret': _plaidSecret,
+            'access_token': accessToken,
+          }),
+        );
+        if (res.statusCode == 200) {
+          print('🔁 Requested refresh for ${inst['name'] ?? 'institution'}');
+        } else {
+          print('⚠️  Refresh error for ${inst['name']}: ${res.body}');
+        }
+      } catch (e) {
+        print('⚠️  Refresh call failed: $e');
+      }
+    }
+  }
+
+  // One-time backfill for recent history (e.g., last 14 days) using transactions/get
+  static Future<int> backfillRecentTransactions({int days = 14}) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final institutions = await supabase
+        .from('institutions')
+        .select('access_token, item_id, name')
+        .eq('user_id', user.id);
+
+    int totalNew = 0;
+    final startDate = DateTime.now().subtract(Duration(days: days)).toIso8601String().split('T')[0];
+    final endDate = DateTime.now().toIso8601String().split('T')[0];
+
+    for (final inst in institutions) {
+      final accessToken = inst['access_token'] as String?;
+      if (accessToken == null) continue;
+      try {
+        final res = await http.post(
+          Uri.parse('$_plaidBaseUrl/transactions/get'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'client_id': _plaidClientId,
+            'secret': _plaidSecret,
+            'access_token': accessToken,
+            'start_date': startDate,
+            'end_date': endDate,
+            'options': {'count': 500, 'offset': 0},
+          }),
+        );
+        if (res.statusCode != 200) {
+          print('❌ Backfill error: ${res.body}');
+          continue;
+        }
+        final data = json.decode(res.body) as Map<String, dynamic>;
+        final txns = (data['transactions'] as List?) ?? const [];
+        for (final t in txns) {
+          try {
+            final transactionId = t['transaction_id'];
+            final accountId = t['account_id'];
+            final amount = ((t['amount'] ?? 0.0) as num).toDouble() * -1;
+            final description = t['name'] ?? 'Unknown';
+            final date = t['date'] ?? endDate;
+            final pendingId = t['pending_transaction_id'] as String?;
+
+            // Replace pending with posted
+            if (pendingId != null && pendingId.isNotEmpty) {
+              try {
+                final pendingExists = await supabase
+                    .from('transactions')
+                    .select('id')
+                    .eq('id', pendingId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                if (pendingExists != null) {
+                  await supabase
+                      .from('transactions')
+                      .delete()
+                      .eq('id', pendingId)
+                      .eq('user_id', user.id);
+                }
+              } catch (_) {}
+            }
+
+            // Skip if id exists
+            final existingById = await supabase
+                .from('transactions')
+                .select('id')
+                .eq('id', transactionId)
+                .eq('user_id', user.id)
+                .maybeSingle();
+            if (existingById != null) continue;
+
+            // Hard guard identical row
+            final existsSame = await supabase
+                .from('transactions')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('account_id', accountId)
+                .eq('date', date)
+                .eq('amount', amount)
+                .eq('description', description)
+                .maybeSingle();
+            if (existsSame != null) continue;
+
+            final transactionData = {
+              'id': transactionId,
+              'user_id': user.id,
+              'account_id': accountId,
+              'amount': amount,
+              'original_currency': t['iso_currency_code'] ?? 'CAD',
+              'description': description,
+              'merchant_name': t['merchant_name'],
+              'date': date,
+              'category': null,
+              'subcategory': null,
+              'is_potential_duplicate': false,
+              'duplicate_of_transaction_id': null,
+              'duplicate_checked_at': null,
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            await supabase.from('transactions').insert(transactionData);
+            totalNew++;
+          } catch (e) {
+            print('  ⚠️  Backfill row failed: $e');
+          }
+        }
+      } catch (e) {
+        print('⚠️  Backfill call failed: $e');
+      }
+    }
+
+    print('📥 Backfill complete: $totalNew new transactions');
+    return totalNew;
   }
 
   // Get all categories (default + user-created)
