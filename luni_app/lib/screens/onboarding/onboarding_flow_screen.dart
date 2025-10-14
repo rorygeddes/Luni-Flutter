@@ -256,11 +256,16 @@ class _WhatIsLuniIntro extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('What is Luni?', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold)),
+          Text('What is Luni?', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: Colors.black87)),
           SizedBox(height: 12.h),
-          _bullet('TRACK: Real-time accounts, spending, and goals in one place.'),
-          _bullet('SPLIT: Instantly split expenses and track who owes who.'),
-          _bullet('PLAN: Set goals and let AI create a simple, actionable plan.'),
+          Text('Luni is your personal financial system that connects your real financial data with AI insights to make money tracking simple and stress-free.',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade800)),
+          SizedBox(height: 18.h),
+          _card('TRACK', 'View your accounts, spending, and goals update in real time all in one central place.', Icons.insights),
+          SizedBox(height: 12.h),
+          _card('SPLIT', 'Split expenses instantly and track who owes who, without the awkward math.', Icons.group),
+          SizedBox(height: 12.h),
+          _card('PLAN', 'Set clear goals and let Luni’s AI build a simple, actionable plan to reach them.', Icons.flag),
           const Spacer(),
           LuniElevatedButton(
             onPressed: onNext,
@@ -272,15 +277,35 @@ class _WhatIsLuniIntro extends StatelessWidget {
     );
   }
 
-  Widget _bullet(String text) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.h),
+  Widget _card(String title, String body, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: const Offset(0, 2))],
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.check_circle, color: const Color(0xFFEAB308), size: 20.w),
-          SizedBox(width: 8.w),
-          Expanded(child: Text(text, style: TextStyle(fontSize: 14.sp, color: Colors.black87))),
+          Container(
+            width: 36.w,
+            height: 36.w,
+            decoration: const BoxDecoration(color: Color(0xFFEAB308), shape: BoxShape.circle),
+            child: Icon(icon, color: Colors.white, size: 20.w),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black87)),
+                SizedBox(height: 6.h),
+                Text(body, style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade800)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -334,15 +359,16 @@ class _ConnectOrDemoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.read<OnboardingProvider>();
     return Padding(
       padding: EdgeInsets.all(24.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Here's how I'll help", style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold)),
+          Text("Here's how I’ll help", style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold, color: Colors.black87)),
           SizedBox(height: 12.h),
-          Text('To give accurate insights, Luni securely connects to your bank accounts via Plaid. Or try Demo Mode to see the experience instantly.',
-              style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade700)),
+          Text('To give accurate insights, Luni securely connects to your bank accounts. Used by 12,000+ institutions. Bank‑level encryption. Live updates. You stay in control.',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade800)),
           SizedBox(height: 20.h),
           LuniElevatedButton(
             onPressed: onConnect,
@@ -368,8 +394,79 @@ class _PlaidConnectScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Connect Bank')),
-      body: Center(
-        child: Text('Use Home → Connect Bank section to link accounts. Coming soon to onboarding.'),
+      body: _PlaidConnectBody(),
+    );
+  }
+}
+
+class _PlaidConnectBody extends StatefulWidget {
+  @override
+  State<_PlaidConnectBody> createState() => _PlaidConnectBodyState();
+}
+
+class _PlaidConnectBodyState extends State<_PlaidConnectBody> {
+  bool _isConnecting = false;
+  String? _status;
+
+  Future<void> _connect() async {
+    setState(() {
+      _isConnecting = true;
+      _status = 'Loading Plaid…';
+    });
+    try {
+      PlaidService.launchPlaidLink(
+        onSuccess: (publicToken) async {
+          setState(() => _status = 'Exchanging token…');
+          try {
+            await PlaidService.exchangePublicToken(publicToken);
+            if (!mounted) return;
+            setState(() => _status = 'Accounts linked!');
+            await Future.delayed(const Duration(milliseconds: 600));
+            if (!mounted) return;
+            Navigator.of(context).pop(); // back to onboarding flow
+          } catch (e) {
+            setState(() => _status = 'Exchange failed: $e');
+          }
+        },
+        onExit: (reason) {
+          setState(() {
+            _isConnecting = false;
+            _status = reason;
+          });
+        },
+        onEvent: (event) {
+          setState(() => _status = event);
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isConnecting = false;
+        _status = 'Error: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(24.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Securely connect via Plaid', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold)),
+          SizedBox(height: 12.h),
+          Text('We never see your credentials. You can remove access anytime.', style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade700)),
+          SizedBox(height: 24.h),
+          LuniElevatedButton(
+            onPressed: _isConnecting ? null : _connect,
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEAB308), foregroundColor: Colors.white),
+            child: _isConnecting ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2) : const Text('Connect with Plaid'),
+          ),
+          if (_status != null) ...[
+            SizedBox(height: 16.h),
+            Text(_status!, style: TextStyle(fontSize: 12.sp, color: Colors.grey.shade800)),
+          ]
+        ],
       ),
     );
   }
